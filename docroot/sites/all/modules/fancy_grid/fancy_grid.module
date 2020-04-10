@@ -1,0 +1,751 @@
+<?php
+/**
+ * @file
+ * Fancy Grid primary module file
+ *
+ * Implements hook_menu, hook_theme,
+ * hook_views_api to register our views style plugin,
+ * hook_ctools_plugin_directory and fancy_grid_ctools_plugin_pre_alter to
+ * alter the IPE controller and register our own plugin code,
+ * hook_form_alter to change views content pane forms
+ * and internal functions for the config form and classes generation.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function fancy_grid_menu() {
+  $items['admin/config/content/fancy_grid'] = array(
+    'title' => 'Fancy Grid',
+    'description' => 'Configure your grid allocation and settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('fancy_grid_admin'),
+    'access arguments' => array('administer fancy_grid'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'fancy_grid.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function fancy_grid_permission() {
+  return array(
+    'administer fancy_grid' => array(
+      'title' => t('Administer the Fancy Grid module'),
+      'description' => t('Perform maintenance tasks for the Fancy Grid module.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_init().
+ *
+ * Make the Fancy Grid layouts available in javascript.
+ */
+function fancy_grid_init() {
+  if (_fancy_grid_config_file_exists()) {
+    drupal_add_js(array('fancy_grid' => _fancy_grid_get_layouts()), 'setting');
+    if (user_access('administer fancy_grid')) {
+      drupal_add_js(drupal_get_path('module', 'fancy_grid') . '/js/fancy_grid.js');
+    }
+    if (_fancy_grid_get_compile()) {
+      drupal_add_css(file_default_scheme() . '://fancy_grid/fancy_grid.css');
+    }
+  }
+}
+
+/**
+ * Implements hook_flush_caches().
+ *
+ * Recreate the Fancy Grid scss config file on cache flush.
+ */
+function fancy_grid_flush_caches() {
+  _fancy_grid_write_config_file();
+  return array();
+}
+
+/**
+ * Config form for one element. For example a pane or a view.
+ *
+ * @param string $type
+ *  Type of the config form. E.g. view, pane, panel.
+ * @param array $settings
+ *  Current used fancy_grid element configuration.
+ *
+ * @return
+ *  Drupal form-api form array.
+ */
+function _fancy_grid_element_config_form($type, $settings) {
+  $form = array();
+
+  $defaults = _fancy_grid_get_settings_defaults($type);
+  $layouts = _fancy_grid_get_layouts();
+  $config = _fancy_grid_get_grid_configuration();
+
+  if (count($layouts) == 0) {
+    drupal_set_message(t('You need to configure at least one layout. Navigate to @url to achieve this.', array('@url' => url('admin/config/content/fancy_grid'))), 'error');
+    return $form;
+  }
+
+  // Create form
+  $form['additional_classes'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Additional css classes for this element.'),
+    '#default_value' => (isset($settings['additional_classes'])) ? $settings['additional_classes'] : $defaults['additional_classes'],
+    '#description' => t('Display suite classes') . ': @ToDo' //. implode(', ', $ds_classes)
+  );
+
+  $form['no_alignment'] = array(
+    '#type' => 'checkbox',
+    '#id' => 'no_alignment',
+    '#title' => t('Do not align the element to the grid. (Fancy Grid won\'t add classes except the ones above to the element.)'),
+    '#default_value' => (isset($settings['no_alignment'])) ? $settings['no_alignment'] : $defaults['no_alignment'],
+  );
+
+  // Configuration to disable the form element if the element is not aligned to the grid.
+  $no_alignment_state = array(
+    'disabled' => array(
+      'input#no_alignment' => array('checked' => TRUE)
+    )
+  );
+
+  $form['is_container'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('This element contains other grid elements. (When you activate this, the element will have no gutter.)'),
+    '#default_value' => (isset($settings['is_container'])) ? $settings['is_container'] : $defaults['is_container'],
+    '#states' => $no_alignment_state,
+  );
+
+  $form['is_wrapper'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('This element is a grid wrapper.'),
+    '#description' => t('Adds the ".grid-wrapper" class to the element. Basically means style="margin: 0 auto; max-width: [fancy-grid-max-width]px".'),
+    '#default_value' => (isset($settings['is_wrapper'])) ? $settings['is_wrapper'] : $defaults['is_wrapper'],
+    '#states' => $no_alignment_state,
+  );
+
+  if ($type == 'ds-region') {
+    $form['extra_wrapper'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Move Fancy Grid classes into a separate div within the wrapping div.'),
+      '#default_value' => (isset($settings['extra_wrapper'])) ? $settings['extra_wrapper'] : $defaults['extra_wrapper'],
+      '#states' => $no_alignment_state,
+    );
+  }
+
+  $form['layouts'] = array(
+    '#tree' => TRUE,
+    '#title' => 'Breakpoints:',
+  );
+
+  foreach ($layouts as $breakpoint_key => $layout) {
+    $breakpoint = breakpoints_breakpoint_load_by_fullkey($breakpoint_key);
+
+    // Get all possible positions for this layout.
+    $positions = array('none' => 'No alignment');
+    foreach ($config[$breakpoint_key]['columns'] as $column => $ranges) {
+      foreach ($ranges as $range) {
+        $positions[$column . '|' . $range] = 'Width: ' . $range . ' Start: ' . $column;
+      }
+    }
+    asort($positions, SORT_NATURAL);
+
+    $form['layouts'][$breakpoint_key] = array(
+      '#type' => 'fieldset',
+      '#title' => check_plain($breakpoint->name),
+    );
+
+    $form['layouts'][$breakpoint_key]['table_start'] = array(
+      '#markup' => '<table style="border: 0"><tbody style="border: 0"><tr>',
+    );
+
+    if ($type == 'view') {
+      $form['layouts'][$breakpoint_key]['range'] = array(
+        '#prefix' => '<td>',
+        '#suffix' => '</td>',
+        '#type' => 'numberfield',
+        '#title' => t('Width of the element'),
+        '#min' => 1,
+        '#max' => $layout['columns'],
+        '#default_value' => (isset($settings['layouts'][$breakpoint_key]['range'])) ? $settings['layouts'][$breakpoint_key]['range'] : $defaults['layouts'][$breakpoint_key]['range'],
+        '#states' => $no_alignment_state,
+      );
+    } else {
+      // Preselect correct position for elements with the old config format.
+      if (isset($settings['layouts'][$breakpoint_key]['position']) && empty($settings['layouts'][$breakpoint_key]['position'])) {
+        $pos = array();
+        $pos[] = $settings['layouts'][$breakpoint_key]['column'];
+        $pos[] = $settings['layouts'][$breakpoint_key]['range'];
+        $settings['layouts'][$breakpoint_key]['position'] = implode('|', $pos);
+      }
+      $form['layouts'][$breakpoint_key]['position'] = array(
+        '#prefix' => '<td>',
+        '#suffix' => '</td>',
+        '#type' => 'select',
+        '#title' => t('Grid position'),
+        '#options' => $positions,
+        '#default_value' => (isset($settings['layouts'][$breakpoint_key]['position'])) ? $settings['layouts'][$breakpoint_key]['position'] : 'none',
+        '#states' => $no_alignment_state,
+      );
+    }
+
+    $form['layouts'][$breakpoint_key]['linebreak'] = array(
+      '#prefix' => '<td>',
+      '#suffix' => '</td>',
+      '#type' => 'checkbox',
+      '#title' => t('Add a line break before this element.'),
+      '#default_value' => (isset($settings['layouts'][$breakpoint_key]['linebreak'])) ? $settings['layouts'][$breakpoint_key]['linebreak'] : $defaults['layouts'][$breakpoint_key]['linebreak'],
+      '#states' => $no_alignment_state,
+    );
+    $form['layouts'][$breakpoint_key]['hidden'] = array(
+      '#prefix' => '<td>',
+      '#suffix' => '</td>',
+      '#type' => 'checkbox',
+      '#title' => t('Hide element for this layout.'),
+      '#default_value' => (isset($settings['layouts'][$breakpoint_key]['hidden'])) ? $settings['layouts'][$breakpoint_key]['hidden'] : $defaults['layouts'][$breakpoint_key]['hidden'],
+      '#states' => $no_alignment_state,
+    );
+
+    if ($type == 'view') {
+      $form['layouts'][$breakpoint_key]['linebreak']['#disabled'] = TRUE;
+      $form['layouts'][$breakpoint_key]['linebreak']['#description'] = t('This value is auto-calculated by Fancy Grid.');
+    }
+
+    $form['layouts'][$breakpoint_key]['table_end'] = array(
+      '#markup' => '</tr></tbody></table>',
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Returns the default fancy_grid settings for a element of specified $type
+ */
+function _fancy_grid_get_settings_defaults($type) {
+  $layouts = variable_get('fancy_grid_layouts', array());
+
+  $defaults = array();
+
+  switch ($type) {
+    case 'region':
+      $defaults['is_container'] = 1;
+      break;
+    default:
+      $defaults['is_container'] = 0;
+      $defaults['is_wrapper'] = 0;
+      $defaults['no_alignment'] = 0;
+      $defaults['additional_classes'] = '';
+      $defaults['extra_wrapper'] = 0;
+  }
+
+  foreach ($layouts as $machine_name => $layout) {
+    $defaults['layouts'][$machine_name] = array();
+    $defaults['layouts'][$machine_name]['range'] = $layout['columns'];
+    $defaults['layouts'][$machine_name]['position'] = '1|' . $layout['columns'];
+    $defaults['layouts'][$machine_name]['linebreak'] = FALSE;
+    $defaults['layouts'][$machine_name]['hidden'] = FALSE;
+
+    switch ($type) {
+      case 'pane':
+        $defaults['layouts'][$machine_name]['linebreak'] = TRUE;
+        break;
+      case 'view':
+        $defaults['layouts'][$machine_name]['column'] = -1;
+        break;
+    }
+  }
+
+  return $defaults;
+}
+
+/**
+ * Wraps a string with a div using given pane style settings.
+ *
+ * @param string $content
+ *  String to wrap.
+ * @param array $settings
+ *  Element fancy_grid configuration.
+ * @param array $extra_classes
+ *  Additional css classes array()
+ *
+ * @return
+ *  String wrapped with div containing all fancy_grid classes.
+ */
+function _fancy_grid_wrap_element($content, $settings, $extra_classes = array()) {
+
+  $attributes = '';
+  $classes_array = _fancy_grid_generate_classes($settings);
+
+  if (is_array($classes_array) && count($classes_array)) {
+    $classes_array = array_merge($classes_array, $extra_classes);
+    $attributes = ' ' . drupal_attributes(array('class' => $classes_array));
+  }
+
+  if (!empty($attributes)) {
+    $output = '<div' . $attributes . '>';
+    $output .= $content;
+    $output .= '</div>';
+  } else {
+    $output = $content;
+  }
+
+  return $output;
+}
+
+/**
+ * Generate fancy_grid classes.
+ *
+ * @param array $settings
+ *  Element fancy_grid configuration.
+ *
+ * @return
+ *  Array containing fancy_grid classes.
+ */
+function _fancy_grid_generate_classes($settings) {
+  $classes_array = array();
+  $linebreak_array = array();
+  $additional_classes_array = array();
+  $layouts = _fancy_grid_get_layouts();
+
+  if (isset($settings['additional_classes']) && !empty($settings['additional_classes'])) {
+    $additional_classes_array = explode(' ', $settings['additional_classes']);
+    $classes_array = array_merge($additional_classes_array, $classes_array);
+  }
+
+  if (isset($settings['no_alignment']) && $settings['no_alignment'] == '1') {
+    return $additional_classes_array;
+  }
+
+  if (isset($settings['is_container']) && $settings['is_container']) {
+    $classes_array[] = 'grid-container';
+  }
+
+  if (isset($settings['is_wrapper']) && $settings['is_wrapper']) {
+    $classes_array[] = 'grid-wrapper';
+    return $classes_array;
+  }
+
+  $classes_array[] = 'grid-element';
+
+  if (!isset($settings['layouts'])) {
+    return $classes_array;
+  }
+
+  foreach ($settings['layouts'] as $machine_name => $layout) {
+
+    // Only generate classes for configured layouts.
+    if (!array_key_exists($machine_name, $layouts)
+      || (isset($layout['position']) && $layout['position'] == 'none')) {
+      continue;
+    }
+
+    $prefix = 'grid-' . $layouts[$machine_name]['identifier'] . '-';
+
+    // Grid span.
+    if (isset($layout['position'])) {
+      $position = explode("|", $layout['position']);;
+      $layout['column'] = $position[0];
+      $layout['range'] = $position[1];
+    }
+    $span = 'c' . $layout['column'] . 'r' . $layout['range'];
+
+    // Contexts.
+    if (isset($settings['contexts'])) {
+      $current_context = _fancy_grid_get_context($machine_name, $settings);
+
+      if ($current_context && $current_context != $layouts[$machine_name]['columns']) {
+        $span .= 'c' . $current_context;
+      }
+    }
+    $classes_array[] = $prefix . $span;
+
+    // Linebreak.
+    if ($layout['linebreak']) {
+      $linebreak_array[] = $prefix . 'linebreak';
+    }
+
+    // hidden.
+    if (isset($layout['hidden']) && $layout['hidden']) {
+      $linebreak_array[] = $prefix . 'hidden';
+    }
+  }
+
+  // Add linebreaks.
+  if (count($linebreak_array) == count($settings['layouts'])) {
+    // Use global linebreak if element has linebreak on each breakpoint.
+    $classes_array[] = 'grid-linebreak';
+  } else if (!empty($linebreak_array)) {
+    $classes_array = array_merge($classes_array, $linebreak_array);
+  }
+
+  return $classes_array;
+}
+
+/**
+ * Get grid column context for a specified layout and element.
+ *
+ * @param string $machine_name
+ *  Machine name of the active layout.
+ * @param array $settings
+ *  Element fancy_grid configuration.
+ *
+ * @return
+ *  Current context as int, FALSE for no context.
+ */
+// Get current context
+function _fancy_grid_get_context($machine_name, $settings) {
+  $current_context = FALSE;
+  foreach ($settings['contexts'] as $context) {
+    if (isset($context['layouts'][$machine_name]['range'])) {
+      if ($context['layouts'][$machine_name]['range'] < $current_context
+          || !$current_context) {
+        $current_context = $context['layouts'][$machine_name]['range'];
+      }
+    }
+  }
+
+  return $current_context;
+}
+
+/**
+ * Writes current fancy_grid configuration to the config file.
+ */
+function _fancy_grid_write_config_file($force_compile = FALSE) {
+  $layouts = _fancy_grid_get_layouts();
+  $config = _fancy_grid_get_grid_configuration();
+  $grid_width = _fancy_grid_get_grid_width();
+  $grid_max_width = _fancy_grid_get_grid_max_width();
+  $config_file = _fancy_grid_get_config_file_directory() . '/fancy_grid.scss';
+
+  // Create sass config file.
+  $breakpoints_sass = array();
+  $sass_config = '$layouts: (';
+
+  foreach ($layouts as $breakpoint_key => $layout) {
+
+    // Create generation list for current layout.
+    $layout_sass = array();
+    $layout_sass[] = $layout['identifier'];
+    $layout_sass[] = $layout['columns'];
+    $layout_sass[] = $layout['gutters'];
+    $layout_sass[] = '(' . $layout['breakpoint'] . ')';
+
+    // Read class configuration
+    $class_config = array();
+    foreach ($config[$breakpoint_key]['columns'] as $column => $ranges) {
+      $class_config[] = '(' . $column . ' (' . implode(' ', $ranges) . '))';
+    }
+
+    // Add class configuration to layout configuration
+    $layout_sass[] = '((' . implode(' ', $class_config) . ') (' . implode(' ', $config[$breakpoint_key]['ranges']) . '))';
+
+    $sass_config .= '(' . implode(' ', $layout_sass) . ')';
+
+    // Avoid comma after last item.
+    if ($layout != end($layouts)) {
+      $sass_config .= ', ';
+    }
+
+    // Add breakpoint variable
+    $breakpoints_sass[] = '$breakpoint-' . $layout['identifier'] . ': ' . $layout['breakpoint'] . ';';
+  }
+
+  $sass_config .= ");\n\n";
+
+  // Add breakpoints variables
+  $sass_config .= implode("\n", $breakpoints_sass) . "\n\n";
+
+  // Add width variables
+  $sass_config .= '$fancy_grid-width: ' . $grid_width . ";\n";
+  $sass_config .= '$fancy_grid-max-width: ' . $grid_max_width . ";";
+
+  // Write file
+  if (!_fancy_grid_config_file_exists())
+    _fancy_grid_create_config_file();
+
+  // Compare old config with the new one.
+  $old_config = file_get_contents($config_file);
+
+  if ($sass_config != $old_config || $force_compile) {
+    // Write config file.
+    if (file_put_contents($config_file, $sass_config)) {
+      if (_fancy_grid_get_compile()) {
+        _fancy_grid_generate_css_file();
+      }
+    }
+    else {
+      drupal_set_message(t('Could not write Fancy Grid config file.'), 'error', FALSE);
+    }
+  }
+}
+
+function _fancy_grid_generate_css_file() {
+
+  // Gather all scripts and merge them into one script.
+  $sass_directory = dirname(__FILE__) . '/scss';
+
+  $scss = array();
+
+  // Load necessary sass libraries.
+  $scss[] = '@import "compass/css3/box-sizing";';
+  $scss[] = '@import "singularitygs";';
+  $scss[] = '@import "breakpoint";';
+
+  // Fancy Grid configuration.
+  $scss[] = file_get_contents(_fancy_grid_get_config_file_directory() . '/fancy_grid.scss');
+
+  // Gather the Fancy Grid scss scripts and remove the @imports statements.
+  $fancy_scss = array();
+  $fancy_scss[] = file_get_contents($sass_directory . '/_fancy_grid.config.scss');
+  $fancy_scss[] = file_get_contents($sass_directory . '/_fancy_grid.mixins.scss');
+  $fancy_scss[] = file_get_contents($sass_directory . '/_fancy_grid.classgenerator.scss');
+  $fancy_scss[] = file_get_contents($sass_directory . '/_fancy_grid.styles.scss');
+  $fancy_scss[] = file_get_contents($sass_directory . '/fancy_grid.utilities.scss');
+  $scss[] = preg_replace('/^\@import.*$/mi', '', implode("\r\n", $fancy_scss));
+
+  // Request compiled css
+  $url = _fancy_grid_get_compile_webservice();
+  $data = array(
+    'input' => implode("\r\n", $scss),
+    'compiler'=>'3.3',
+    'syntax'=>'SCSS',
+    'original_syntax'=>'SCSS',
+    'output_style'=>'expanded',
+  );
+  $options = array(
+    'method'  => 'POST',
+    'headers' => array(
+      'Content-type' => 'application/x-www-form-urlencoded'
+    ),
+    'data' => http_build_query($data),
+    'timeout' => 30,
+  );
+
+  $request = drupal_http_request($url, $options);
+  $data = json_decode($request->data);
+
+  if ($request->code == 200 && is_object($data)) {
+    $css = $data->css;
+    $time = $data->time;
+
+    // Save compiled css into files directory.
+    $css_file = _fancy_grid_get_config_file_directory() . '/fancy_grid.css';
+    $url = file_create_url(file_default_scheme() . '://fancy_grid/fancy_grid.css');
+
+    // Give the site builder some love.
+    $lines_arr = preg_split('/\n|\r/', $css);
+    $num_lines = count($lines_arr);
+
+    if (file_put_contents($css_file, $css)) {
+      drupal_set_message('Successfully compiled the Fancy Grid css code with ' . $num_lines . ' lines within ' . $time .'s. It is located in your <a href="' . $url . '">public files directory</a>.');
+    }
+    else {
+      drupal_set_message(t('Could not write Fancy Grid css file. Check your file directory permissions.'), 'error', FALSE);
+    }
+  } else {
+    drupal_set_message('There was an error while compiling the Fancy Grid css.', 'error');
+
+    // Give the site builder some love.
+    if (module_exists('devel')) {
+      dpm($request);
+    } else {
+      drupal_set_message('Install the devel module to get more informations about the failed compile request.', error);
+    }
+  }
+}
+
+/**
+ * Getter for the layout configuration.
+ */
+function _fancy_grid_get_grid_configuration() {
+  $layouts = _fancy_grid_get_layouts();
+  $configs = array();
+
+  // For every breakpoint, we generate several image styles.
+  foreach ($layouts as $breakpoint_key => $layout) {
+    
+    // Read class configuration
+    $list = explode("\n", $layout['config']);
+    $list = array_map('trim', $list);
+    $list = array_filter($list, 'strlen');
+
+    $layoutColumns = array();
+    $layoutRanges = array();
+
+    foreach ($list as $position => $text) {
+      $matches = array();
+      if (preg_match('/(.*)\|(.*)/', $text, $matches)) {
+        $columns = explode(",", $matches[1]);
+        $ranges = explode(",", $matches[2]);
+        // Transform * values to valid ones
+        if ($columns[0] == '*') {
+          $columns = range(1, $layout['columns']);
+        }
+        if ($ranges[0] == '*') {
+          $ranges = range(1, $layout['columns']);
+        }
+        $layoutRanges = array_merge($ranges, $layoutRanges);
+        foreach ($columns as $column) {
+          if (array_key_exists($column, $layoutColumns)) {
+            $layoutColumns[$column] = array_merge($ranges, $layoutColumns[$column]);
+          } else {
+            $layoutColumns[$column] = $ranges;
+          }
+        }
+      }
+    }
+
+    // Order arrays
+    foreach ($layoutColumns as $column => $ranges) {
+      asort($ranges);
+      $layoutColumns[$column] = $ranges;
+    }
+    asort($layoutRanges);
+
+    $configs[$breakpoint_key] = array(
+      'columns' => $layoutColumns,
+      'ranges' => $layoutRanges,
+    );
+  }
+
+  return $configs;
+
+}
+
+/**
+ * Getter for the layout configuration.
+ */
+function _fancy_grid_get_layouts() {
+  return variable_get('fancy_grid_layouts', array());
+}
+
+/**
+ * Getter for the grid width.
+ */
+function _fancy_grid_get_grid_width() {
+  return variable_get('fancy_grid_grid_width', '90%');
+}
+
+/**
+ * Getter for the grid max width.
+ */
+function _fancy_grid_get_grid_max_width() {
+  return variable_get('fancy_grid_grid_max_width', '960px');
+}
+
+/**
+ * Getter for the compile trigger.
+ */
+function _fancy_grid_get_compile() {
+  return variable_get('fancy_grid_compile', 0);
+}
+
+/**
+ * Getter for the compile webservice.
+ */
+function _fancy_grid_get_compile_webservice() {
+  return variable_get('fancy_grid_compile_webservice', 'http://sassmeister.com/app/3.3/compile');
+}
+
+/**
+ * Getter for the breakpoint group.
+ */
+function _fancy_grid_get_breakpoint_group() {
+  return variable_get('fancy_grid_breakpoint_group', '');
+}
+
+/**
+ * Getter for the fancy_grid file directory.
+ */
+function _fancy_grid_get_config_file_directory() {
+  $file_directory = drupal_realpath(file_default_scheme() . '://');
+  return $file_directory . '/fancy_grid';
+}
+
+/**
+ * Check if config file exists.
+ */
+function _fancy_grid_config_file_exists() {
+  $config_file = _fancy_grid_get_config_file_directory() . '/fancy_grid.scss';
+  return file_exists($config_file);
+}
+
+/**
+ * Create empty config file if it does not exist.
+ */
+function _fancy_grid_create_config_file() {
+  $config_file = _fancy_grid_get_config_file_directory() . '/fancy_grid.scss';
+  if (!file_exists($config_file)) {
+    if (!file_exists(dirname($config_file)))
+      mkdir(dirname($config_file), 0755, TRUE);
+    touch($config_file);
+  }
+  return TRUE;
+}
+
+/**
+ * Return possible sass import paths for implementation guide.
+ */
+function _fancy_grid_sass_import_paths() {
+  $admin_theme = drupal_realpath(drupal_get_path('theme', $GLOBALS['theme']));
+  $default_theme = drupal_realpath(drupal_get_path('theme', variable_get('theme_default', NULL)));
+  $sass_directory = drupal_realpath(drupal_get_path('module', 'fancy_grid') . '/scss');
+
+  $paths = array();
+  $paths[] = _fancy_grid_get_config_file_directory();
+  $paths[] = $sass_directory;
+  $paths[] = _fancy_grid_find_relative_path($default_theme, $sass_directory);
+  $paths[] = _fancy_grid_find_relative_path($default_theme, _fancy_grid_get_config_file_directory());
+  $paths[] = _fancy_grid_find_relative_path($admin_theme, $sass_directory);
+  $paths[] = _fancy_grid_find_relative_path($admin_theme, _fancy_grid_get_config_file_directory());
+
+  // Add format code.
+  foreach ($paths as &$path) {
+    $path = 'add_import_path "' . $path . '"';
+  }
+  return $paths;
+}
+
+
+/**
+ * Find the relative file system path between two file system paths
+ *
+ * Source: https://gist.github.com/ohaal/2936041
+ *
+ * @param string $frompath
+ *  Path to start from
+ * @param string $topath
+ *  Path we want to end up in
+ *
+ * @return string
+ *  Path leading from $frompath to $topath
+ */
+function _fancy_grid_find_relative_path($frompath, $topath) {
+    $from = explode( DIRECTORY_SEPARATOR, $frompath ); // Folders/File
+    $to = explode( DIRECTORY_SEPARATOR, $topath ); // Folders/File
+    $relpath = '';
+
+    $i = 0;
+    // Find how far the path is the same
+    while ( isset($from[$i]) && isset($to[$i]) ) {
+        if ( $from[$i] != $to[$i] ) break;
+        $i++;
+    }
+    $j = count( $from ) - 1;
+    // Add '..' until the path is the same
+    while ( $i <= $j ) {
+        if ( !empty($from[$j]) ) $relpath .= '..' . DIRECTORY_SEPARATOR;
+        $j--;
+    }
+    // Go to folder from where it starts differing
+    while ( isset($to[$i]) ) {
+        if ( !empty($to[$i]) ) $relpath .= $to[$i] . DIRECTORY_SEPARATOR;
+        $i++;
+    }
+
+    // Strip last separator
+    return substr($relpath, 0, -1);
+}

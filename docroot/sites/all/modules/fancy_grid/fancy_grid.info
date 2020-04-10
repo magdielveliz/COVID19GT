@@ -1,0 +1,14 @@
+name = Fancy Grid
+description = Flexible and configurable implementation of the Singularity.gs SASS grid framework into Drupal. It supports Display Suite, Views and Panels.
+dependencies[] = elements
+dependencies[] = breakpoints
+package = Fancy Grid
+core = 7.x
+configure = admin/config/content/fancy_grid
+
+; Information added by Drupal.org packaging script on 2015-07-06
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "fancy_grid"
+datestamp = "1436188442"
+

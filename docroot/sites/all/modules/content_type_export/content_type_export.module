@@ -1,0 +1,552 @@
+<?php
+/**
+ * @file
+ * Module that provides an export feature for Content Types built with the UI.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function content_type_export_menu() {
+  $items = array();
+  $items['admin/structure/types/manage/%node_type/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'content_type_export_node_task',
+    'page arguments' => array(4),
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 100,
+    'file' => 'content_type_export.node.inc',
+    'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+  );
+
+  if(module_exists('taxonomy')) {
+    $items['admin/structure/taxonomy/%taxonomy_vocabulary_machine_name/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_taxonomy_vocabulary',
+      'page arguments' => array(3),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file' => 'content_type_export.taxonomy.inc',
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+  }
+
+  $items['admin/structure/types/manage/%node_type/fields/%field_ui_menu/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'content_type_export_field',
+    'page arguments' => array(4, 6),
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 100,
+  );
+
+  if (function_exists('commerce_product_types')) {
+    foreach (commerce_product_types() as $product_type) {
+      // Convert underscores to hyphens for the menu item argument.
+      $type_arg = strtr($product_type['type'], '_', '-');
+      $items['admin/commerce/products/types/' . $type_arg . '/fields/%field_ui_menu/export'] = array(
+        'title' => 'Export',
+        'page callback' => 'content_type_export_commerce_product_field',
+        'page arguments' => array(4, 6),
+        'access arguments' => array('administer content'),
+        'type' => MENU_LOCAL_TASK,
+        'weight' => 100,
+      );
+    }
+  }
+
+  if (function_exists('commerce_customer_profile_types')) {
+    foreach (commerce_customer_profile_types() as $type => $profile_type) {
+      // Convert underscores to hyphens for the menu item argument.
+      $type_arg = strtr($type, '_', '-');
+
+      $items['admin/commerce/customer-profiles/types/' . $type_arg . '/fields/%/export'] = array(
+        'title' => 'Export',
+        'page callback' => 'content_type_export_profile_field',
+        'page arguments' => array(4, 6),
+        'access arguments' => array('administer content'),
+        'type' => MENU_LOCAL_TASK,
+        'weight' => 100,
+      );
+    }
+  }
+
+  if(module_exists('taxonomy')) {
+    $items['admin/structure/taxonomy/%taxonomy_vocabulary_machine_name/fields/%field_ui_menu/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_field',
+      'page arguments' => array(3, 5),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file' => 'content_type_export.taxonomy.inc',
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+  }
+
+  if(module_exists('entityform')) {
+    $items['admin/structure/entityform_types/manage/%entity_object/export'] = array(
+      'title' => 'Export',
+      'load arguments' => array('entityform'),
+      'page callback' => 'content_type_export_entityform',
+      'page arguments' => array(4),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file' => 'content_type_export.entityform.inc',
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+  }
+
+  if(module_exists('paragraphs')) {
+    $items['admin/structure/paragraphs/%paragraphs_bundle/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'paragraphs_type_export_field',
+      'page arguments' => array(3),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file' => 'content_type_export.paragraphs.inc',
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+
+    $items['admin/structure/paragraphs/%paragraphs_bundle/fields/%field_ui_menu/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_field',
+      'page arguments' => array(3, 5, 'paragraphs_item'),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+  }
+
+  if(module_exists('bean')) {
+    $items['admin/structure/block-types/manage/%bean_type/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'bean_type_export',
+      'page arguments' => array(4),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+      'file' => 'content_type_export.bean.inc',
+      'file path' => drupal_get_path('module', 'content_type_export') . '/inc',
+    );
+
+    $items['admin/structure/block-types/manage/%bean_type/fields/%field_ui_menu/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_field',
+      'page arguments' => array(4, 6, 'bean'),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+    );
+  }
+
+  if(module_exists('field_collection')) {
+
+    $items['admin/structure/field-collections/%field_collection_field_name/fields/%field_ui_menu/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_field',
+      'page arguments' => array(3, 5, 'field_collection_item'),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+    );
+
+  }
+
+  if(module_exists('commerce_line_item_ui')) {
+    foreach (commerce_line_item_types() as $type => $line_item_type) {
+      // Convert underscores to hyphens for the menu item argument.
+      $type_arg = strtr($type, '_', '-');
+
+      $items['admin/commerce/config/line-items/' . $type_arg . '/fields/%field_ui_menu/export/' . $type] = array(
+        'title' => 'Export',
+        'page callback' => 'content_type_export_field',
+        'page arguments' => array(8, 6, 'commerce_line_item'),
+        'access arguments' => array('administer content'),
+        'type' => MENU_LOCAL_TASK,
+        'weight' => 100,
+      );
+    }
+  }
+
+  if(module_exists('commerce')) {
+
+    $items['admin/commerce/config/order/fields/%field_ui_menu/export'] = array(
+      'title' => 'Export',
+      'page callback' => 'content_type_export_field',
+      'page arguments' => array('commerce_order', 5, 'commerce_order'),
+      'access arguments' => array('administer content'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 100,
+    );
+
+  }
+
+  $items['admin/config/people/accounts/fields/%field_ui_menu/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'content_type_export_field',
+    'page arguments' => array('user', 5, 'user'),
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 100,
+  );
+
+  $items['admin/reports/fields/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['content_type_export_all_entity_fields'],
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 100,
+    'file' => 'content_type_export.all.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Export fields for a commerce customer profile type.
+ */
+function content_type_export_profile_field($profile_type, $field_name) {
+  $bundle = (object) ['type' => $profile_type, 'entity_type' => 'commerce_customer_profile'];
+  $instance = field_info_instance('commerce_customer_profile', $field_name, $profile_type);
+  return content_type_export_field($bundle, $instance);
+}
+
+/**
+ * Export fields for a commerce product.
+ */
+function content_type_export_commerce_product_field($product_type, $field) {
+  $product_type = str_replace('-', '_', $product_type);
+  $bundle = (object) ['type' => $product_type, 'entity_type' => 'commerce_product'];
+  $instance = field_info_instance('commerce_product', $field['field_name'], $product_type);
+  return content_type_export_field($bundle, $instance);
+}
+
+/**
+ * Export field definition and instance definition for a specific field.
+ */
+function content_type_export_field($bundle, $field, $entity_type = NULL) {
+
+  $all_fields = field_info_fields();
+  $single_field[$field['field_name']] = $all_fields[$field['field_name']];
+
+  drupal_set_title('Export ' . $field['label']);
+
+  if (is_string($bundle)) {
+    $bundle_name = $bundle;
+  }
+  elseif (!empty($bundle->vid)) {
+    $bundle_name = $bundle->machine_name;
+  }
+  elseif (!empty($bundle->bundle)) {
+    $bundle_name = $bundle->bundle;
+  }
+  else {
+    $bundle_name = $bundle->type;
+  }
+
+  if (is_null($entity_type)) {
+    if(!empty($bundle->entity_type)) {
+      $entity_type = $bundle->entity_type;
+    }
+    else {
+      $entity_type = isset($bundle->vid) ? 'taxonomy_term' : 'node';
+    }
+  }
+
+  $content['fields_export'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Field',
+    '#value' => content_type_export_dump_fields_as_code($bundle_name, $entity_type, $single_field),
+    '#resizable' => TRUE,
+  );
+  $content['instances_export'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Instance for ' . $entity_type . ' ' . $bundle_name,
+    '#value' => content_type_export_dump_instances_as_code($bundle_name, $entity_type, $single_field),
+    '#resizable' => TRUE,
+  );
+  $content['instances_update_export'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Code to update instance for ' . $entity_type . ' ' . $bundle_name,
+    '#value' => content_type_export_dump_instances_as_code($bundle_name, $entity_type, $single_field, TRUE),
+    '#resizable' => TRUE,
+  );
+
+  if($field['widget']['module'] == 'field_collection') {
+
+    $content['field_collection_bundle'] = array(
+      '#type' => 'textarea',
+      '#title' => 'Field collection bundle',
+      '#value' => content_type_export_dump_fields_as_code($field['field_name'], 'field_collection_item'),
+      '#resizable' => TRUE,
+    );
+
+    $content['field_collection_fields'] = array(
+      '#type' => 'textarea',
+      '#title' => 'Field collection fields',
+      '#value' => content_type_export_dump_fields_as_code($field['field_name'], 'field_collection_item'),
+      '#resizable' => TRUE,
+    );
+
+    $content['field_collection_instances'] = array(
+      '#type' => 'textarea',
+      '#title' => 'Field collection instances',
+      '#value' => content_type_export_dump_instances_as_code($field['field_name'], 'field_collection_item'),
+      '#resizable' => TRUE,
+    );
+
+  }
+
+  return $content;
+
+}
+
+/**
+ * Export the field definitions and dependencies to re-create all the fields.
+ */
+function content_type_export_dump_fields_as_code($bundle_name, $entity_type = 'node', $fields = NULL) {
+
+  $all_fields = is_null($fields) ? field_info_fields() : $fields;
+
+  //dpm($all_fields, '$all_fields');
+
+  $export = '';
+
+  // Go through all the fields in this Drupal instance.
+  foreach ($all_fields as $field_name => $field_details) {
+    if ($field_name == 'body' && is_null($fields)) {
+      continue;
+    }
+
+    // If the current field is attached to the current bundle export it.
+    if (!empty($field_details['bundles'][$entity_type]) && in_array($bundle_name, $field_details['bundles'][$entity_type])) {
+      // If a taxonomy field the taxonomy may need to be created.
+      if ($field_details['type'] == 'taxonomy_term_reference') {
+        $taxonomy = (array) taxonomy_vocabulary_machine_name_load($field_details['settings']['allowed_values'][0]['vocabulary']);
+        unset($taxonomy['vid']);
+        unset($taxonomy['hierarchy']);
+        unset($taxonomy['weight']);
+        unset($taxonomy['rdf_mapping']);
+
+        $taxonomy_export = '$vocabulary = (object) ' . content_type_export_var_export_reformat($taxonomy) . ';';
+        $export .= <<<RAW
+// {$taxonomy['machine_name']} taxonomy
+$taxonomy_export
+if (taxonomy_vocabulary_machine_name_load(\$vocabulary->machine_name) === FALSE) {
+  taxonomy_vocabulary_save(\$vocabulary);
+}
+
+
+RAW;
+
+      }
+
+      // Unset unnecessary properties.
+      $field = $all_fields[$field_name];
+      unset($field['translatable']);
+      unset($field['entity_types']);
+      unset($field['bundles']);
+      unset($field['id']);
+      unset($field['deleted']);
+      unset($field['module']);
+      unset($field['active']);
+      unset($field['locked']);
+      unset($field['columns']);
+      unset($field['indexes']);
+      unset($field['foreign keys']);
+      unset($field['storage']);
+
+      // Export the field as code.
+      $field_export = '$field = ' . content_type_export_var_export_reformat($field) . ';';
+      $export .= <<<RAW
+// $field_name field
+$field_export
+if (field_info_field(\$field['field_name']) === NULL) {
+  field_create_field(\$field);
+}
+
+
+RAW;
+
+      // Field collections!
+      // If the current field is the name of a bundle also, then we need to
+      // export fields in that bundle as well!
+      $field_is_collection = FALSE;
+      foreach ($all_fields as $other_field_name => $other_field_details) {
+        if ($field_name === $other_field_name) {
+          continue;
+        }
+
+        if (!empty($other_field_details['bundles']['field_collection_item']) && in_array($field_name, $other_field_details['bundles']['field_collection_item'])) {
+          $field_is_collection = TRUE;
+        }
+      }
+      if ($field_is_collection) {
+        $export .= content_type_export_dump_fields_as_code($field_name, 'field_collection_item');
+      }
+
+    }
+  }
+
+  return $export;
+}
+
+/**
+ * Attach specific instances of defined fields to thise content type.
+ */
+function content_type_export_dump_instances_as_code($bundle_name, $entity_type = 'node', $fields = NULL, $update = FALSE) {
+
+  $all_fields = is_null($fields) ? field_info_fields() : $fields;
+
+  $export = '';
+
+  // Go through all the fields in this Drupal instance.
+  foreach ($all_fields as $field_name => $field_details) {
+    if ($field_name == 'body' && is_null($fields)) {
+      continue;
+    }
+
+    // If the current field is attached to the current bundle, we'll need to
+    // export it.
+    if (!empty($field_details['bundles'][$entity_type]) && in_array($bundle_name, $field_details['bundles'][$entity_type])) {
+      // Unset unnecessary properties.
+      $instance = field_read_instance($entity_type, $field_name, $bundle_name);
+      unset($instance['id']);
+      unset($instance['field_id']);
+
+      // Export the instance as code.
+      $instance_export = '$instance = ' . content_type_export_var_export_reformat($instance) . ';';
+      if ($update) {
+        $export .= <<<RAW
+// $field_name instance
+$instance_export
+field_update_instance(\$instance);
+
+RAW;
+      }
+      else {
+        $export .= <<<RAW
+// $field_name instance
+$instance_export
+if (field_info_instance('$entity_type', '$field_name', '$bundle_name') === NULL) {
+  field_create_instance(\$instance);
+}
+
+RAW;
+      }
+
+      // Field collections.
+      // If the current field is the name of a bundle also, then we need to
+      // export fields in that bundle as well.
+      $field_is_collection = FALSE;
+      foreach ($all_fields as $other_field_name => $other_field_details) {
+        if ($field_name === $other_field_name) {
+          continue;
+        }
+
+        if (!empty($other_field_details['bundles']['field_collection_item']) && in_array($field_name, $other_field_details['bundles']['field_collection_item'])) {
+          $field_is_collection = TRUE;
+        }
+      }
+      if ($field_is_collection) {
+        $export .= content_type_export_dump_instances_as_code($field_name, 'field_collection_item');
+      }
+    }
+  }
+
+  // Field groups.
+  if (module_exists('field_group')) {
+    $groups = field_group_info_groups($entity_type, $bundle_name, 'form');
+
+    foreach ($groups as $group_name => $group) {
+      $group_export = content_type_export_var_export_reformat((array) $group);
+
+      $export .= <<<RAW
+// group $group_name
+\$group = (object) $group_export;
+field_group_group_save(\$group);
+
+ctools_include('export');
+ctools_export_crud_enable('field_group', \$group->identifier);
+
+RAW;
+    }
+  }
+
+  return $export;
+}
+
+/**
+ * Dump the variable to PHP code and then perform some basic reformatting.
+ */
+function content_type_export_var_export_reformat($var) {
+  // Dump the variable and store the dump output for processing.
+  $export = var_export($var, TRUE);
+
+  // Minor formatting changes for style.
+  $export = str_replace("array (", "array(", $export);
+  $export = preg_replace("/\=\>[ \n\t]+array\(/", '=> array(', $export);
+
+  return $export;
+}
+
+/**
+ * Generate the whole .install file.
+ */
+function content_type_export_install_file($content) {
+  $type = $content['bundle_export']['#value'];
+  $fields = $content['fields_export']['#value'];
+  $instances = $content['instances_export']['#value'];
+  $uninstall = $content['uninstall']['#value'];
+
+  $export = <<<PHP
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function MY_MODULE_install() {
+  MY_MODULE_create_type();
+  MY_MODULE_create_fields();
+  MY_MODULE_create_instances();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function MY_MODULE_uninstall() {
+$uninstall
+}
+
+/**
+ * Set up the content type.
+ */
+function MY_MODULE_create_type() {
+  $type
+}
+
+/**
+ * Create the fields
+ */
+function MY_MODULE_create_fields() {
+$fields
+}
+
+/**
+ * Create the field instances
+ */
+function MY_MODULE_create_instances() {
+$instances
+}
+
+PHP;
+
+  return $export;
+}

@@ -1,0 +1,98 @@
+{
+  "name": "easychart",
+  "version": "3.1.4",
+  "description": "Easychart is a graphical user interface, built on top of the stunning Highcharts-javascript library",
+  "keywords": [
+    "chart",
+    "easy",
+    "series",
+    "data",
+    "highcharts",
+    "gui",
+    "config"
+  ],
+  "main": "dist/ec.js",
+  "dependencies": {
+    "highcharts": "^4.2.3"
+  },
+  "devDependencies": {
+    "papaparse": "^4.1.2",
+    "highlight.js": "^9.0.0",
+    "json-fn": "^0.60.0",
+    "dom-delegator": "^13.1.0",
+    "drag-drop": "^2.3.1",
+    "folderify": "^1.1.0",
+    "lodash.clonedeep": "^4.3.0",
+    "lodash.drop": "^4.0.1",
+    "lodash.find": "^4.2.0",
+    "lodash.first": "^3.0.0",
+    "lodash.foreach": "^4.1.0",
+    "lodash.isarray": "^4.0.0",
+    "lodash.isempty": "^4.1.2",
+    "lodash.isequal": "^4.1.0",
+    "lodash.isnan": "^3.0.0",
+    "lodash.isstring": "^4.0.1",
+    "lodash.isundefined": "^3.0.1",
+    "lodash.join": "^4.0.1",
+    "lodash.map": "^4.2.0",
+    "lodash.merge": "^4.3.0",
+    "lodash.remove": "^4.2.0",
+    "lodash.slice": "^4.0.2",
+    "lodash.split": "^4.2.1",
+    "lodash.tolower": "^4.1.1",
+    "lodash.trim": "^4.2.0",
+    "lodash.union": "^4.2.0",
+    "main-loop": "^3.2.0",
+    "mediatorjs": "^0.1.4",
+    "svg-browserify": "0.0.2",
+    "browserify": "^13.0.0",
+    "browserify-css": "^0.9.0",
+    "browserify-data": "^0.2.0",
+    "vdom-virtualize": "^1.0.1",
+    "simple-color-picker": "0.0.9",
+    "virtual-dom": "^2.1.1",
+    "xhr": "^2.2.0",
+    "lodash.assign": "^4.0.3",
+    "lodash.clone": "^4.3.0",
+    "lodash.fill": "^3.2.2",
+    "lodash.filter": "^4.2.0",
+    "lodash.pullat": "^4.1.0",
+    "lodash.size": "^4.0.3",
+    "lodash.tonumber": "^4.0.1",
+    "bourbon-neat": "^1.7.2",
+    "connect": "^3.4.1",
+    "gulp": "^3.9.0",
+    "gulp-header": "^1.7.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-sass": "^2.1.0",
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-uglify": "^1.5.1",
+    "node-neat": "^1.7.2",
+    "node-sass": "latest",
+    "serve-static": "^1.10.2",
+    "uglify-js": "latest",
+    "vinyl-buffer": "^1.0.0",
+    "vinyl-source-stream": "^1.1.0",
+    "watchify": "^3.7.0"
+  },
+  "scripts": {
+    "genOptions": "node buildCustomise"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/bestuurszaken/easychart.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bestuurszaken/easychart/issues"
+  },
+  "browserify": {
+    "transform": [
+      "browserify-css",
+      "browserify-data",
+      "svg-browserify",
+      "folderify"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+name = Fancy Grid Picture
+description = "Generates Picture mappings based on the grid configuration."
+dependencies[] = fancy_grid_image_styles
+dependencies[] = picture
+package = "Fancy Grid"
+core = 7.x
+version = "7.x-1.0"
+; Information added by Drupal.org packaging script on 2015-07-06
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "fancy_grid"
+datestamp = "1436188442"
+

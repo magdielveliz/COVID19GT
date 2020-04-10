@@ -1,0 +1,109 @@
+<?php
+/**
+ * @file
+ * Module that provides an export feature for nodes built with the UI.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function node_to_code_menu() {
+  $items = array();
+  $items['node/%node/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'node_to_code_export',
+    'page arguments' => array(1),
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+/**
+ * Generate code required to programmatically recreate the node passed in.
+ */
+function node_to_code_export($node) {
+
+  drupal_set_message(t('This module has next to no testing. Bug fixes may be needed. Test the code below before assuming it works.'), 'warning');
+
+  $export = '$node = new stdClass();' . PHP_EOL;
+
+  $child_entities_export = '';
+
+  $ignore = array('nid', 'vid', 'vuuid', 'uuid', 'data');
+  foreach ($node as $k => $v) {
+    if (in_array($k, $ignore)) {
+      continue;
+    }
+
+    if (is_array($v)) {
+
+      $field =& $v;
+      $field_name =& $k;
+      $field_info = field_info_field($field_name);
+
+      $add_field_to_node = TRUE;
+
+      if ($field_info !== NULL) {
+
+        if ($field_info['type'] == 'paragraphs') {
+          $add_field_to_node = FALSE;
+
+          foreach ($field as $items) {
+            foreach ($items as $item) {
+              $paragraph = paragraphs_item_load($item['value']);
+
+              $child_entities_export .= PHP_EOL . "\$paragraph = new ParagraphsItemEntity(array(
+  'field_name' => '$field_name',
+  'bundle' => '{$paragraph->bundle}',
+));
+\$paragraph->is_new = TRUE;
+\$paragraph->setHostEntity('node', \$node);
+";
+
+              foreach ($paragraph as $pk => $pv) {
+
+                if (is_array($pv)) {
+                  $pexported = content_type_export_var_export_reformat($pv);
+                  $child_entities_export .= '$paragraph->' . $pk . ' = ' . $pexported . ';' . PHP_EOL;
+                }
+
+              }
+
+              $child_entities_export .= '$paragraph->save();' . PHP_EOL;
+
+            }
+          }
+
+        }
+
+      }
+
+      if ($add_field_to_node) {
+        $exported = content_type_export_var_export_reformat($v);
+        $export .= '$node->' . $k . ' = ' . $exported . ';' . PHP_EOL;
+      }
+
+    }
+    else {
+      $value = is_numeric($v) ? $v : "'" . $v . "'";
+      $export .= '$node->' . $k . ' = ' . $value . ';' . PHP_EOL;
+    }
+
+  }
+
+  $export .= '$node = node_submit($node);' . PHP_EOL;
+  $export .= 'node_save($node);' . PHP_EOL . PHP_EOL;
+
+  $export = $export . $child_entities_export;
+
+  $content['node_export'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Node creation script',
+    '#value' => $export,
+    '#resizable' => TRUE,
+  );
+
+  return $content;
+}

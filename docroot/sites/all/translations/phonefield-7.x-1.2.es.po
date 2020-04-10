@@ -1,0 +1,26 @@
+# Spanish translation of Phone Field (7.x-1.2)
+# Copyright (c) 2019 by the Spanish translation team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Phone Field (7.x-1.2)\n"
+"POT-Creation-Date: 2019-05-31 10:51+0000\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Language-Team: Spanish\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+msgid "Text"
+msgstr "Texto"
+msgid "Fields"
+msgstr "Campos"
+msgid "Phone"
+msgstr "Teléfono"
+msgid "Phone number"
+msgstr "Número de teléfono"
+msgid "@label"
+msgstr "@label"
+msgid "No label"
+msgstr "Ninguna etiqueta"

@@ -1,0 +1,60 @@
+<?php
+/**
+ * @file
+ * Install file for the fancy_grid_panels module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function fancy_grid_panels_install() {
+  fancy_grid_panels_update_7000();
+}
+
+/**
+ * Convert panels
+ */
+function fancy_grid_panels_update_7000(&$sandbox = NULL) {
+  $flexigrid_layout = 'desktop';
+
+  $breakpoint_groups = breakpoints_breakpoint_group_load_all();
+  reset($breakpoint_groups);
+  $breakpoint_group = key($breakpoint_groups);
+
+  $result = db_query("SELECT did FROM {panels_display}");
+  $dids = array();
+  foreach ($result as $obj) {
+    $dids[] = $obj->did;
+  }
+
+  // Convert all panels
+  foreach (panels_load_displays($dids) as $display) {
+    $display->layout = str_replace('flexigrid', 'fancy_grid', $display->layout);
+    foreach ($display->content as $id => $panel) {
+      if ($panel->style['style'] == 'flexigrid') {
+        $panel->style['style'] = 'fancy_grid';
+        if (!empty($panel->style['settings'])) {
+          foreach ($breakpoint_groups[$breakpoint_group]->breakpoints as $bp_key) {
+            $panel->style['settings']['layouts'][$bp_key] = $panel->style['settings']['layouts'][$flexigrid_layout];
+          }
+          unset($panel->style['settings']['layouts'][$flexigrid_layout]);
+        }
+      }
+    }
+    foreach ($display->panel_settings as $id => $settings) {
+      if (!is_array($settings)) {
+        if ($settings == 'flexigrid') {
+          $display->panel_settings['style'] = 'fancy_grid';
+        }
+      }
+      elseif (($id != 'style_settings') && ($settings['style'] == 'flexigrid')) {
+        $display->panel_settings[$id]['style'] = 'fancy_grid';
+        foreach ($breakpoint_groups[$breakpoint_group]->breakpoints as $bp_key) {
+          $display->panel_settings['style_settings'][$id]['layouts'][$bp_key] = $display->panel_settings['style_settings'][$id]['layouts'][$flexigrid_layout];
+        }
+        unset($display->panel_settings['style_settings'][$id]['layouts'][$flexigrid_layout]);
+      }
+    }
+    panels_save_display($display);
+  }
+}

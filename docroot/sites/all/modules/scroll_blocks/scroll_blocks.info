@@ -1,0 +1,12 @@
+name = Scroll blocks
+description = Provides the possibility to show and hide blocks on page scroll.
+core = 7.x
+
+dependencies[] = block
+
+; Information added by Drupal.org packaging script on 2017-12-20
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "scroll_blocks"
+datestamp = "1513798987"
+

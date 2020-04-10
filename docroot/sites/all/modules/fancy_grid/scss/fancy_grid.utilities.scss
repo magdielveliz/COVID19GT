@@ -1,0 +1,48 @@
+@import 'fancy_grid.config';
+@import 'fancy_grid.classgenerator';
+@import 'fancy_grid.styles';
+
+
+// =============================================================================
+// Helper Classes
+// =============================================================================
+
+// Grid element
+.grid-element {
+  @include box-sizing(border-box);
+}
+
+// Grid container, div in selector for higher specificity
+div.grid-container {
+  padding-left: 0;
+  padding-right: 0;
+  @extend %clearfix;
+}
+
+// Grid wrapper
+.grid-wrapper {
+  @extend %grid-wrapper;
+}
+
+// Grid / Panel region
+.grid-region {
+  @extend %clearfix;
+}
+
+// Linebreak for all breakpoints.
+.grid-linebreak {
+  clear: both;
+}
+
+// Colorize our grid elements when displaying the grid.
+body.display-grid {
+  .grid-element {
+    outline: 1px dashed red;
+  }
+  .panels-ipe-region > .panels-ipe-sort-container > .grid-element {
+    outline: 1px dashed blue;
+  }
+  .view-content > .grid-element {
+    outline: 1px dashed green;
+  }
+}

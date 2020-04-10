@@ -1,0 +1,13 @@
+name = Image preview
+description = A jQuery-based hover preview feature for imagefields. Bigger preview on hover+zoom in feature
+core = 7.x
+package = Image
+dependencies[] = image
+dependencies[] = libraries
+
+; Information added by Drupal.org packaging script on 2015-09-10
+version = "7.x-1.0-alpha2"
+core = "7.x"
+project = "image_preview"
+datestamp = "1441911179"
+

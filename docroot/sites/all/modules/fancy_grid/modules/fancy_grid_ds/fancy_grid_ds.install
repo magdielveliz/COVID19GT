@@ -1,0 +1,47 @@
+<?php
+/**
+ * @file
+ * Install file for the fancy_grid_ds module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function fancy_grid_ds_install() {
+  fancy_grid_ds_update_7000();
+}
+
+/**
+ * Convert ds_layout_settings
+ */
+function fancy_grid_ds_update_7000(&$sandbox = NULL) {
+  ctools_include('export');
+  $ds_layout_settings = ctools_export_crud_load_all('ds_layout_settings');
+  $flexigrid_layout = 'desktop';
+
+  $breakpoint_groups = breakpoints_breakpoint_group_load_all();
+  reset($breakpoint_groups);
+  $breakpoint_group = key($breakpoint_groups);
+
+  // Convert all the ds_layout settings
+  foreach ($ds_layout_settings as $id => $obj) {
+    if (array_key_exists('flexigrid', $obj->settings) && !array_key_exists('fancy_grid', $obj->settings)) {
+      $obj->layout = str_replace('flexigrid', 'fancy_grid', $obj->layout);
+      // Copy flexigrid settings
+      $obj->settings['fancy_grid'] = $obj->settings['flexigrid'];
+      // Replicate layouts using breakpoint groups
+      foreach ($breakpoint_groups[$breakpoint_group]->breakpoints as $bp_key) {
+        $obj->settings['fancy_grid']['wrapper']['layouts'][$bp_key] = $obj->settings['flexigrid']['wrapper']['layouts'][$flexigrid_layout];
+      }
+      unset($obj->settings['fancy_grid']['wrapper']['layouts'][$flexigrid_layout]);
+      foreach($obj->settings['flexigrid']['regions'] as $reg_name => $region) {
+        foreach ($breakpoint_groups[$breakpoint_group]->breakpoints as $bp_key) {
+          $obj->settings['fancy_grid']['regions'][$reg_name]['layouts'][$bp_key] = $obj->settings['flexigrid']['regions'][$reg_name]['layouts'][$flexigrid_layout];
+        }
+        unset($obj->settings['fancy_grid']['regions'][$reg_name]['layouts'][$flexigrid_layout]);
+      }
+      unset($obj->settings['flexigrid']);
+      $ret = ctools_export_crud_save('ds_layout_settings', $obj);
+    }
+  }
+}

@@ -1,0 +1,86 @@
+// =============================================================================
+// Automatic layout class generator from Flexinode.
+// =============================================================================
+//
+// Configures Singularity.gs based on the fancy_grid configuration.
+//
+// Generates classes with this schema:
+//
+// Grid alignment:
+// .grid-[breakpoint]-c[starting column of element]r[width of element]c[column context]
+//
+// Linebreaks:
+// .grid-[breakpoint]-linebreak
+//
+
+@mixin createGrid($layout) {
+  $machine_name: nth($layout, 1);
+  $max_columns: nth($layout, 2);
+  $gutter: nth($layout, 3);
+  $breakpoint: nth($layout, 4);
+  $layout_config: nth($layout, 5);
+
+  // Generate Singularity.gs grids.
+  @include add-grid($max_columns at $breakpoint);
+
+  // Generate Singularity.gs gutters.
+  @include add-gutter($gutter at $breakpoint);
+
+  // Generate grid classes.
+  $class_config: nth($layout_config, 1);
+  $contexts: nth($layout_config, 2);
+
+  @each $config in $class_config {
+    $column: nth($config, 1);
+    $ranges: nth($config, 2);
+
+    // Loop through all ranges.
+    @each $range in $ranges {
+
+      // Generate grid alignment class.
+      .grid-#{$machine_name}-c#{$column}r#{$range} {
+        @include breakpoint($breakpoint) {
+          @include grid-span($range, $column);
+        }
+      }
+
+      // Generate context based grid alignment classes.
+      @each $context in $contexts {
+        @if $context >= $range {
+          @if $context < $max_columns {
+            .grid-#{$machine_name}-c#{$column}r#{$range}c#{$context} {
+              @include breakpoint($breakpoint) {
+                @include grid-span($range, $column, $context);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @if (length(nth($layouts,1)) != 1) {
+    // Generate linebreak classes.
+    .grid-#{$machine_name}-linebreak {
+      @include breakpoint($breakpoint) {
+        clear: both;
+      }
+    }
+
+    // Generate hidden classes.
+    .grid-#{$machine_name}-hidden {
+      @include breakpoint($breakpoint) {
+        display: none;
+      }
+    }
+  }
+}
+
+// Loop through layouts.
+@if (length(nth($layouts, 1)) == 1) {
+  @include createGrid($layouts);
+} @else {
+  @each $layout in $layouts {
+    @include createGrid($layout);
+  }
+}

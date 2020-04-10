@@ -1,0 +1,18 @@
+name = Fancy Grid Views
+description = "Integrates Fancy Grid into Views."
+dependencies[] = fancy_grid
+dependencies[] = views
+package = "Fancy Grid"
+core = 7.x
+version = "7.x-1.0"
+
+# Views
+files[] = theme/fancy_grid.views.inc
+files[] = views/fancy_grid.views.inc
+files[] = views/views_plugin_style_fancy_grid.inc
+; Information added by Drupal.org packaging script on 2015-07-06
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "fancy_grid"
+datestamp = "1436188442"
+

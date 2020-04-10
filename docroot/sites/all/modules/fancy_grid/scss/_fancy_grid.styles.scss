@@ -1,0 +1,43 @@
+// =============================================================================
+// Panels IPE styling
+// =============================================================================
+
+// Improve drag&drop handling while user is sorting panes.
+.panels-ipe-sort-container.ui-sortable.sorting .grid-element{
+  max-height: 15em;
+  overflow: hidden;
+}
+
+// Remove annoying IPE margin.
+body .panels-ipe-editing .panels-ipe-portlet-content {
+  margin: 0;
+}
+
+// IPE borders can break our positioning.
+.panels-ipe-editing div.panels-ipe-portlet-wrapper {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  clear: both;
+}
+
+// IPE wrappers with padding look ugly!
+.panels-ipe-portlet-wrapper.grid-element {
+  padding: 0;
+}
+
+// Disable grid alignment:
+// For pane wrapper within IPE wrappers while IPE is active
+// If sorting is active
+
+.panels-ipe-portlet-wrapper.grid-element > .panels-ipe-portlet-content > .grid-element,
+.panels-ipe-sort-container.ui-sortable.sorting .grid-element {
+  float: none;
+  clear: none;
+  width: 100%;
+  margin: 0;
+
+  @if $debug {
+    outline: none;
+  }
+}

@@ -1,0 +1,12 @@
+name = Viewfield
+description = Defines a field type to display a view.
+core = 7.x
+package = Fields
+dependencies[] = views
+files[] = tests/viewfield.test
+
+; Information added by Drupal.org packaging script on 2019-09-05
+version = "7.x-3.0-alpha1"
+core = "7.x"
+project = "viewfield"
+datestamp = "1567713787"

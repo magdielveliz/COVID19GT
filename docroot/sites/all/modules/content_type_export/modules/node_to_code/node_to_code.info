@@ -1,0 +1,13 @@
+name = Node to code
+description = Export a node as PHP code that could be run to recreate the node.
+core = 7.x
+package = Development
+
+dependencies[] = content_type_export
+
+; Information added by Drupal.org packaging script on 2017-03-14
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "content_type_export"
+datestamp = "1489457288"
+

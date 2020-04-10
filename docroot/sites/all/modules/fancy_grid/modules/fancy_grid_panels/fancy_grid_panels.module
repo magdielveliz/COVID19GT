@@ -1,0 +1,112 @@
+<?php
+/**
+ * @file
+ * Fancy Grid Panels primary module file
+ *
+ * Implements hook_ctools_plugin_directory and fancy_grid_panels_ctools_plugin_pre_alter
+ * to alter the IPE controller and register our own plugin code
+ */
+
+/**
+ * Implements hook_FORM_ID_alter()
+ * Set Fancy Grid as default panels style.
+ */
+function fancy_grid_panels_form_panels_edit_style_type_form_alter(&$form, &$form_state, $form_id) {
+  // Set Fancy Grid as default style.
+  $form['style']['#default_value'] = 'fancy_grid';
+}
+
+/**
+* Implements hook_ctools_plugin_post_alter(&$plugin, &$info)
+* Alter the Panels standard renderer to ensure the Fancy Grid context is always available.
+*/
+function fancy_grid_panels_ctools_plugin_pre_alter(&$plugin, &$info) {
+  // Change Panels standard renderer to our modified Fancy Grid version.
+  if ($plugin['plugin module'] == 'panels' &&
+    $plugin['plugin type'] == 'display_renderers' &&
+    $plugin['module'] == 'panels' &&
+    $plugin['renderer'] == 'panels_renderer_standard') {
+
+    $plugin['path'] = drupal_get_path('module', 'fancy_grid_panels') . '/plugins/display_renderers';
+    $plugin['renderer'] = 'panels_renderer_fancy_grid';
+  }
+
+  // Ensure Panels standard renderer class is available because we kicked it out of the ctools plugins.
+  if ($plugin['plugin module'] == 'panels' &&
+    $plugin['plugin type'] == 'display_renderers') {
+    require_once drupal_get_path('module', 'panels') . '/plugins/display_renderers/panels_renderer_standard.class.php';
+  }
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function fancy_grid_panels_ctools_plugin_directory($module, $plugin) {
+  $modules = array('panels');
+  if (in_array($module, $modules)) {
+    return 'plugins/' . $plugin;
+  }
+}
+
+/**
+ * Implementation of hook_ctools_plugin_api().
+ *
+ * Inform CTools about version information for various plugins implemented by
+ * Fancy Grid.
+ *
+ * @param string $owner
+ *   The system name of the module owning the API about which information is
+ *   being requested.
+ * @param string $api
+ *   The name of the API about which information is being requested.
+ */
+function fancy_grid_panels_ctools_plugin_api($owner, $api) {
+  if ($owner == 'panels' && $api == 'pipelines') {
+    return array(
+      'version' => 1,
+      'path' => drupal_get_path('module', 'fancy_grid_panels') . '/includes',
+    );
+  }
+}
+
+/**
+ * Internal function to apply default styles to regions.
+ * Used by panels renderer classes.
+ */
+function _fancy_grid_panels_prepare_regions($regions) {
+  $default = array(
+    'style' => panels_get_style('fancy_grid'),
+    'style settings' => _fancy_grid_get_settings_defaults('region'),
+  );
+
+  foreach ($regions as $region_id => $region) {
+    if (!isset($region['style']) || $region['style']['name'] == 'default') {
+      $region['style'] = $default['style'];
+      $region['style settings'] = $default['style settings'];
+      $regions[$region_id] = $region;
+    }
+  }
+
+  return $regions;
+}
+
+/**
+ * Internal function to apply default styles to panes.
+ * Used by panels renderer classes.
+ */
+function _fancy_grid_panels_prepare_panes($panes) {
+  $default = array(
+    'style' => 'fancy_grid',
+    'settings' => _fancy_grid_get_settings_defaults('pane'),
+  );
+
+  foreach ($panes as $pane_id => $pane) {
+    if (!isset($pane->style['style']) || $pane->style['style'] == 'default') {
+      $pane->style['style'] = $default['style'];
+      $pane->style['settings'] = $default['settings'];
+      $panes[$pane_id] = $pane;
+    }
+  }
+
+  return $panes;
+}

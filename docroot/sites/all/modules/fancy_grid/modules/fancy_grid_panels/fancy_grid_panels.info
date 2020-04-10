@@ -1,0 +1,17 @@
+name = Fancy Grid Panels
+description = "Integrates Fancy Grid into Panels with panel pane and region support."
+dependencies[] = fancy_grid
+dependencies[] = panels
+dependencies[] = panels_ipe
+package = "Fancy Grid"
+core = 7.x
+version = "7.x-1.0"
+
+files[] = plugins/styles/fancy_grid/fancy_grid.inc
+scripts[] = js/fancy_grid_panels.js
+; Information added by Drupal.org packaging script on 2015-07-06
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "fancy_grid"
+datestamp = "1436188442"
+

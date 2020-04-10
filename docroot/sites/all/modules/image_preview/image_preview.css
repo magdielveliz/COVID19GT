@@ -1,0 +1,17 @@
+#image-preview-active {
+  z-index: 1000;
+  position: absolute;
+  border: none;
+  padding: 10px;
+  display: none;
+  color: #000;
+  background: #222 url(loading.gif) no-repeat center;
+  -moz-border-radius: 10px;
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+}
+
+#image-preview-active span {
+  display: block;
+  color: #fff;
+}

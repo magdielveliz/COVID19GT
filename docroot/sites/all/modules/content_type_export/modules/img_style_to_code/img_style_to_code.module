@@ -1,0 +1,76 @@
+<?php
+/**
+ * @file
+ * Export an image style to code.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function img_style_to_code_menu() {
+  $items = array();
+  $items['admin/config/media/image-styles/edit/%image_style/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'img_style_to_code_export',
+    'page arguments' => array(5),
+    'access arguments' => array('administer content'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function img_style_to_code_form_image_style_form_alter(&$form, &$form_state, $form_id) {
+  if (isset($form['name']['#default_value'])) {
+    $form['export_link'] = array(
+      '#markup' => l(t('Export image style to code'), 'admin/config/media/image-styles/edit/' . $form['name']['#default_value'] . '/export', array('attributes' => array('class' => array('button')))),
+      '#weight' => -1,
+    );
+  }
+}
+
+/**
+ * Given an image style export it to code.
+ */
+function img_style_to_code_export($image_style) {
+
+  $export_create = <<<RAW
+\$style = image_style_load('{$image_style['name']}');
+if (empty(\$style)) {
+  \$style = image_style_save(array('name' => '{$image_style['name']}'));
+}
+
+RAW;
+
+  foreach ($image_style['effects'] as $effect) {
+    // Unset properties not required.
+    unset($effect['ieid']);
+    $effect['isid'] = '__style_isid__';
+    $exported = content_type_export_var_export_reformat($effect);
+    $export_create .= '$effect = ' . $exported . ';' . PHP_EOL;
+    $export_create = str_replace('\'__style_isid__\'', '$style[\'isid\']', $export_create);
+    $export_create .= 'image_effect_save($effect);' . PHP_EOL;
+
+  }
+
+  $export_delete = 'image_style_delete(image_style_load(\'' . $image_style['name'] . '\'));';
+
+  $content['style_create'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Create or update if already exists',
+    '#value' => $export_create,
+    '#resizable' => TRUE,
+  );
+
+  $content['style_delete'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Delete style',
+    '#value' => $export_delete,
+    '#resizable' => TRUE,
+  );
+
+  return $content;
+}

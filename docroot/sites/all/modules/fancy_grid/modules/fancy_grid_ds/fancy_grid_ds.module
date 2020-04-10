@@ -1,0 +1,170 @@
+<?php
+/**
+ * @file
+ * Fancy Grid Display Suite module file
+ *
+ * Implements hook_module_implements_alter, hook_form_FORM_ID_alter,
+ * hook_ds_layout_settings_alter, hook_ds_pre_render_alter.
+ *
+ */
+
+/**
+ * Implements hook_ds_layout_info().
+ * Adds custom layouts from 1 to 10 regions to ds.
+ */
+function fancy_grid_ds_ds_layout_info() {
+  $path = drupal_get_path('module', 'fancy_grid_ds');
+
+  $config = array("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten");
+
+  $layouts = array();
+
+  for ($i = 0; $i < count($config); $i++) {
+    $name = $config[$i];
+    $machine_name = strtolower($name);
+
+    $regions = array();
+    for ($j = 0; $j <= $i; $j++) {
+      $regions[strtolower($config[$j])] = t($config[$j]);
+    }
+
+    $region_plural = $i == 0 ? 'Region' : 'Regions';
+
+    $layouts['fancy_grid_' . $machine_name] = array(
+      'label' => t('Fancy Grid ' . $name . ' ' . $region_plural),
+      'regions' => $regions,
+      'path' => $path . '/ds_layouts/fancy_grid_' . $machine_name,
+      'module' => 'Fancy Grid',
+    );
+  }
+
+  return $layouts;
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ * Ensure that we alter the field_ui form after ds.
+ */
+function fancy_grid_ds_module_implements_alter(&$implementations, $hook) {
+  if ($hook == 'form_alter' && isset($implementations['fancy_grid_ds'])) {
+    $group = $implementations['fancy_grid_ds'];
+    unset($implementations['fancy_grid_ds']);
+    $implementations['fancy_grid_ds'] = $group;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Add the Fancy Grid configuration forms to the display layout wrapper and regions.
+ */
+function fancy_grid_ds_form_field_ui_display_overview_form_alter(&$form, &$form_state, $form_id) {
+  // Get active layout.
+  ctools_include('export');
+  $layout = new stdClass();
+  $ds_layout_settings = ctools_export_crud_load_all('ds_layout_settings');
+  if (isset($ds_layout_settings[$form['#export_id']])) {
+    $layout = $ds_layout_settings[$form['#export_id']];
+  }
+
+  if (!empty($layout) && isset($layout->layout) && isset($ds_layouts[$layout->layout]) && empty($layout->disabled)) {
+    $layout->settings = $layout->settings;
+    $layout->regions = $ds_layouts[$layout->layout]['regions'];
+  }
+
+  // Add fancy_grid settings for each region.
+  $form['additional_settings']['fancy_grid'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Fancy Grid'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#tree' => TRUE,
+  );
+
+  // Enable Fancy Grid configuration only if a layout is selected.
+  if (!isset($layout->settings['regions'])) {
+    $form['additional_settings']['fancy_grid']['infotext'] = array(
+      '#markup' => t('You need to select a layout to enable the Fancy Grid configuration.'),
+    );
+    return;
+  }
+
+  // Store settings in array for better access.
+  if (isset ($layout->settings['fancy_grid'])) {
+    $settings = $layout->settings['fancy_grid'];
+  } else {
+    $settings = array();
+  }
+
+  $form['additional_settings']['fancy_grid']['enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Fancy Grid for this display'),
+    '#default_value' => isset($settings['enabled']) ? $settings['enabled'] : 0,
+  );
+
+  // Create form for the layout wrapper and every region.
+  $form['additional_settings']['fancy_grid']['wrapper'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Layout wrapper'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $defaults = _fancy_grid_get_settings_defaults('ds-region');
+
+  $fancy_grid_form = _fancy_grid_element_config_form('ds-region', isset($settings['wrapper']) ? $settings['wrapper'] : $defaults);
+  $form['additional_settings']['fancy_grid']['wrapper'] += $fancy_grid_form;
+
+  foreach (array_keys($layout->regions) as $region) {
+    $title = $layout->regions[$region];
+    $form['additional_settings']['fancy_grid']['regions'][$region] = array(
+      '#type' => 'fieldset',
+      '#title' => $title .  ' ' . t('region'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+
+    $fancy_grid_form = _fancy_grid_element_config_form('ds-region', isset($settings['regions'][$region]) ? $settings['regions'][$region] : $defaults);
+    $form['additional_settings']['fancy_grid']['regions'][$region] += $fancy_grid_form;
+  }
+}
+
+/**
+ * Implements hook_ds_layout_settings_alter().
+ * Write the configuration in the layout record.
+ */
+function fancy_grid_ds_ds_layout_settings_alter(&$record, $form_state) {
+  if (!isset($form_state['values']['additional_settings']['fancy_grid'])
+    || $form_state['values']['additional_settings']['fancy_grid']['enabled'] == 0)
+    return;
+  $record->settings['fancy_grid'] = $form_state['values']['additional_settings']['fancy_grid'];
+}
+
+/**
+ * Implements hook_ds_pre_render_alter().
+ */
+function fancy_grid_ds_ds_pre_render_alter(&$layout_render_array, $context, &$vars) {
+  if ($layout = ds_get_layout($vars['elements']['#entity_type'], $vars['elements']['#bundle'], $vars['elements']['#view_mode'])) {
+
+    if (!isset($layout['settings']['fancy_grid']))
+      return;
+
+    $settings = $layout['settings']['fancy_grid'];
+
+    // Add fancy_grid classes to the layout wrapper.
+    $fancy_grid_classes = _fancy_grid_generate_classes($settings['wrapper']);
+    if(!isset($settings['wrapper']['extra_wrapper']) || !$settings['wrapper']['extra_wrapper']) {
+      $vars['classes_array'] = array_merge($vars['classes_array'], $fancy_grid_classes);
+      $vars['extra_wrapper'] = FALSE;
+    } else {
+      $vars['extra_wrapper'] = TRUE;
+      $vars['extra_wrapper_classes'] = implode(' ', $fancy_grid_classes);
+    }
+
+    // Add fancy_grid classes to the layout regions.
+    foreach($settings['regions'] as $title => $region) {
+      $fancy_grid_classes = _fancy_grid_generate_classes($region);
+      $classes = explode(' ', $vars[$title . '_classes']);
+      $vars[$title . '_classes'] = implode(' ', array_merge($classes, $fancy_grid_classes));
+    }
+  }
+}

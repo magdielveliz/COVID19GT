@@ -1,0 +1,47 @@
+.block.scroll-blocks {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transition: all 1s;
+  transform: translateX(-50%) translateY(100%)
+}
+.block.scroll-blocks.scroll-blocks--visible {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 9;
+  /* Fall-back for browsers that don't support rgba */
+  background: white;
+  background: rgba(255, 255, 255, 0.75);
+  transition: all 1s;
+}
+.block.scroll-blocks .close-button {
+  position: absolute;
+  right: -16px;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  background-color: black;
+  border-radius: 50%;
+  opacity: 0.3;
+  cursor: pointer;
+}
+.block.scroll-blocks .close-button:hover {
+  opacity: 1;
+}
+.block.scroll-blocks .close-button::before, .block.scroll-blocks .close-button::after {
+  position: absolute;
+  left: 15px;
+  top: 7px;
+  content: ' ';
+  height: 19px;
+  width: 2px;
+  background-color: white;
+}
+.block.scroll-blocks .close-button:before {
+  transform: rotate(45deg);
+}
+.block.scroll-blocks .close-button:after {
+  transform: rotate(-45deg);
+}

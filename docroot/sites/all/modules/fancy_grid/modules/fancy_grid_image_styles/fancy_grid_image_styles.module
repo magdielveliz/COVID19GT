@@ -1,0 +1,70 @@
+<?php
+/**
+ * @file
+ * Fancy Grid Image Styles module file
+ *
+ * Generates image styles based on the grid configuration.
+ */
+
+function fancy_grid_image_styles_image_default_styles() {
+  $styles = array();
+  $layouts = _fancy_grid_get_layouts();
+  $configs = _fancy_grid_get_grid_configuration();
+  $gridWidth = _fancy_grid_get_grid_width();
+  $gridMaxWidth = _fancy_grid_get_grid_max_width();
+
+  // Get the maximum possible size of a grid element.
+  if (strpos($gridWidth, '%') === FALSE) {
+    $imageMaxWidth = $gridWidth;
+  } else {
+    $imageMaxWidth = $gridMaxWidth;
+  }
+  $imageMaxWidth = intval($imageMaxWidth);
+
+  // For every breakpoint, we generate several image styles.
+  foreach ($layouts as $breakpoint_key => $layout) {
+    $breakpoint = breakpoints_breakpoint_load_by_fullkey($breakpoint_key);
+    $maxLayoutWidth = $imageMaxWidth;
+
+    // Look for a max width property in the breakpoint configuration
+    $pattern = '/\((?: *width | *)[\d\w\.]+ +([\.\d]+)px/';
+    preg_match($pattern, $layout['breakpoint'], $matches);
+
+    if ($matches) {
+      $maxLayoutWidth = $matches[1];
+    }
+
+    // For every column range, create a image style.
+    foreach ($configs[$breakpoint_key]['ranges'] as $range) {
+      $multipliers = $breakpoint->multipliers;
+      asort($multipliers);
+      foreach($multipliers as $multiplier) {
+        $machine_name = 'fancy-' . $layout['identifier'] . '-' . $range;
+        $suffix = '';
+        if ($multiplier != '1x') {
+          $suffix = $multiplier;
+          $machine_name .= '-' . $suffix;
+        }
+
+        $width = ceil($maxLayoutWidth / $layout['columns'] * $range * intval($multiplier));
+
+        $styles[$machine_name] = array(
+          'label' => 'Fancy ' . $breakpoint->name . ' ' . $range . ' columns' . empty($suffix) ? '' : (' (' . $multiplier . ')'),
+          'effects' => array(
+            array(
+              'name' => 'image_scale',
+              'data' => array(
+                'width' => $width,
+                'height' => '',
+                'upscale' => 1,
+              ),
+              'weight' => 0,
+            )
+          ),
+        );
+      }
+    }
+  }
+
+  return $styles;
+}

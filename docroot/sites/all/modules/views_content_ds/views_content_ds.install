@@ -1,0 +1,13 @@
+<?php
+
+use Drupal\views_content_ds\Upgrade\UpOrDown;
+
+/**
+ * Implements hook_update_N()
+ *
+ * Upgrade from 7.x-1.x to 7.x-2.x
+ */
+function views_content_ds_update_7200() {
+  // Convert to new field names.
+  UpOrDown::create('up')->run();
+}

@@ -1,0 +1,84 @@
+<?php
+/**
+ * @file
+ * Fancy Grid Picture Mappings module files
+ *
+ * Generates Picture mappings based on the grid configuration.
+ */
+
+/**
+ * Implements hook_ctools_plugin_api().
+ */
+function fancy_grid_picture_ctools_plugin_api($module = NULL, $api = NULL) {
+  if ($module == "picture" && $api == "default_picture_mapping") {
+    return array("version" => "2");
+  }
+}
+
+/**
+ * Implements hook_default_picture_mapping().
+ */
+function fancy_grid_picture_default_picture_mapping() {
+  $export = array();
+  $breakpoint_group = _fancy_grid_get_breakpoint_group();
+  $layouts = _fancy_grid_get_layouts();
+  $configs = _fancy_grid_get_grid_configuration();
+
+  // Gather all column ranges in the grid.
+  $ranges = array();
+  foreach ($configs as $breakpoint_key => $config) {
+    $ranges = array_merge($config['ranges'], $ranges);
+  }
+  $ranges = array_unique($ranges);
+  asort($ranges);
+
+  // Create on mapping for every column range available
+  foreach ($ranges as $range) {
+    $mapping = array();
+    $machine_name = 'fancy-picture-' . $range;
+
+    $picture_mapping = new PictureMapping();
+    $picture_mapping->api_version = 2;
+    $picture_mapping->label = 'Fancy Picture ' . $range . ' columns';
+    $picture_mapping->machine_name = $machine_name;
+    $picture_mapping->breakpoint_group = $breakpoint_group;
+
+    // Add a image style for every breakpoint.
+    foreach ($layouts as $breakpoint_key => $layout) {
+      $breakpointMappings = array();
+      $breakpoint = breakpoints_breakpoint_load_by_fullkey($breakpoint_key);
+
+      // If there is no matching image style, try to find a bigger one.
+      $minRange = $range;
+      if (!in_array($range, $configs[$breakpoint_key]['ranges'])) {
+        foreach ($configs[$breakpoint_key]['ranges'] as $higherRange) {
+          if ($higherRange > $minRange) {
+            $minRange = $higherRange;
+            break;
+          }
+        }
+      }
+
+      // Enables retina support.
+      $image_style = 'fancy-' . $layout['identifier'] . '-' . $minRange;
+      $multipliers = $breakpoint->multipliers;
+      asort($multipliers);
+      foreach($multipliers as $multiplier) {
+        $suffix = '';
+        if ($multiplier != '1x') {
+          $suffix = '-' . $multiplier;
+        }
+        $breakpointMappings[$multiplier] = array(
+          'mapping_type' => 'image_style',
+          'image_style' => $image_style  . $suffix,
+        );
+      }
+      $mapping[$breakpoint_key] = $breakpointMappings;
+    }
+    $picture_mapping->mapping = $mapping;
+
+    $export[$machine_name] = $picture_mapping;
+  }
+
+  return $export;
+}

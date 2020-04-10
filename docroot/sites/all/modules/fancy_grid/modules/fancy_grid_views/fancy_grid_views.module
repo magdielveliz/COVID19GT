@@ -1,0 +1,68 @@
+<?php
+/**
+ * @file
+ * Fancy Grid primary module file
+ *
+ * Implements hook_theme, hook_views_api to register our views style plugin and
+ * hook_form_alter to change views content pane forms.
+ */
+
+/**
+ * Implements hook_views_api().
+ */
+function fancy_grid_views_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'fancy_grid_views') . '/views',
+    'template path' => drupal_get_path('module', 'fancy_grid_views') . '/theme',
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function fancy_grid_views_theme() {
+  return array(
+    'views_view_fancy_grid' => array(
+      'arguments' => array('form' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Adds Fancy Grid configuration to view content pane form to overwrite the
+ * view style settings.
+ */
+function fancy_grid_views_form_views_content_views_panes_content_type_edit_form_alter(&$form, &$form_state, $form_id) {
+
+  $conf = $form_state['conf'];
+
+  if ($form_state['view']->style_plugin->plugin_name == 'fancy_grid') {
+
+    $form['fancy_grid'] = array(
+      '#type' => 'fieldset',
+      '#title' => '<h1>' . t('Fancy Grid - View row settings') . '</h1>',
+      '#tree' => TRUE,
+      '#description' => t('Alter the view Fancy Grid settings for this pane. <strong>Care:</strong> These settings will be applied to the view results, not the view/pane itself.<br/><strong>Warning: Due to a bug in the views/panels integration, these settings are not reapplied to ajax enabled views after they got rerendered by an ajax call.</strong>'),
+    );
+
+    $view_style_settings = isset($conf['fancy_grid_overwrite']) ? $conf['fancy_grid_overwrite'] : $form_state['view']->style_options;
+
+    $form['fancy_grid'] += _fancy_grid_element_config_form('view', $view_style_settings);
+
+    $form['#submit'][] = 'fancy_grid_views_form_views_content_views_panes_content_type_edit_form_submit';
+  }
+}
+
+/**
+ * Custom submit handler for views content pane form.
+ */
+function fancy_grid_views_form_views_content_views_panes_content_type_edit_form_submit(&$form, &$form_state) {
+
+  // Save pane Fancy Grid settings in pane configuration.
+  if (isset($form_state['values']['fancy_grid'])) {
+    $form_state['conf']['fancy_grid_overwrite'] = $form_state['values']['fancy_grid'];
+  }
+}

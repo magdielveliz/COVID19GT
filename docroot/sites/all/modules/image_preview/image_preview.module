@@ -1,0 +1,210 @@
+<?php
+
+/**
+ * Implements hook_library().
+ *
+ * Registers JavaScript/CSS libraries associated with a module.
+ */
+function image_preview_library() {
+  $libraries = array();
+  $libraries['imgPreview'] = array(
+    'title' => 'Image Preview',
+    'website' => 'http://plugins.jquery.com/project/imgPreview',
+    'version' => '0.22',
+    'js' => array(
+      drupal_get_path('module', 'image_preview') . '/image_preview.js' => array(),
+    ),
+    'css' => array(
+      drupal_get_path('module', 'image_preview') . '/image_preview.css' => array(),
+    ),
+  );
+  return $libraries;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ *
+ * Describing the formatter types implemented by the module.
+ */
+function image_preview_field_formatter_info() {
+  $formatters = array();
+  $formatters['image_preview'] = array(
+    'label' => t('Image Preview'),
+    'field types' => array('image'),
+    // Set some std values here so we need no isset() or empty() checks later.
+    'settings' => array(
+      'image_style' => '',
+      'image_link' => '',
+      'image_preview_style' => 'medium',
+      'image_preview_action' => 'imgpreview',
+      'image_preview_zoom' => 'no',
+      'image_preview_zoom_style' => 'large',
+    ),
+  );
+  return $formatters;
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ *
+ * Build the settings of the formatter.
+ */
+function image_preview_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  // Build off of the standard Image field formatter settings. This is "image style" and "link image to".
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $element = image_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
+
+  // Add the Hover Preview action settings.
+  $element['image_preview_action'] = array(
+    '#title' => t('Image preview action'),
+    '#type' => 'select',
+    '#default_value' => $settings['image_preview_action'],
+    '#options' => array(
+      'imgpreview' => t('Image Preview'),
+      /*'replace' => t('Replace Image'),*/
+    ),
+  );
+  // Get all available image styles.
+  $image_styles = image_style_options(FALSE);
+  // Image style to use.
+  $element['image_preview_style'] = array(
+    '#title' => t('Image preview style'),
+    '#type' => 'select',
+    '#default_value' => $settings['image_preview_style'],
+    '#empty_option' => t('None (original image)'),
+    '#options' => $image_styles,
+  );
+  // Zoom on keypress feature.
+  $element['image_preview_zoom'] = array(
+    '#title' => t('Image preview zoom'),
+    '#type' => 'select',
+    '#default_value' => $settings['image_preview_zoom'],
+    '#options' => array(
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ),
+  );
+  // Image style for Zoom.
+  $element['image_preview_zoom_style'] = array(
+    '#title' => t('Image preview zoom style'),
+    '#type' => 'select',
+    '#default_value' => $settings['image_preview_zoom_style'],
+    '#options' => $image_styles,
+  );
+
+  return $element;
+}
+
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ *
+ * This hook is solely responsible for providing a summary of the formatting in
+ * the "Manage Display" page for the chosen content type. Our summary will now
+ * reflect the settings that we've chosen.
+ */
+function image_preview_field_formatter_settings_summary($field, $instance, $view_mode) {
+  // Build off of the standard Image summary.
+  $summary = image_field_formatter_settings_summary($field, $instance, $view_mode);
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+
+  // We set a default value for all above, so we don't need to check if set.
+  $summary .= '<br />' . t('Image preview action: @action', array('@action' => $settings['image_preview_action']));
+  $summary .= '<br />' . t('Image preview style: @style', array('@style' => $settings['image_preview_style']));
+  $summary .= '<br />' . t('Image preview zoom: @zoom', array('@zoom' => $settings['image_preview_zoom']));
+  $summary .= '<br />' . t('Image preview zoom style: @zoom_style', array('@zoom_style' => $settings['image_preview_zoom_style']));
+
+  return $summary;
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function image_preview_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  // Each hover preview item is created with an image element.
+  foreach ($items as $delta => $item) {
+
+    $element[$delta]['#theme'] = 'image';
+
+    // The title tag.
+    if (isset($item['title']) && !empty($item['title'])) {
+      $element[$delta]['#title'] = $item['title'];
+    }
+
+    // The alt tag.
+    if (isset($item['alt']) && !empty($item['alt'])) {
+      $element[$delta]['#alt'] = $item['alt'];
+    }
+
+    // The image path is constructed based on the image style.
+    if (isset($display['settings']['image_style']) && !empty($display['settings']['image_style'])) {
+      $element[$delta]['#path'] = image_style_url($display['settings']['image_style'], $item['uri']);
+    }
+    else {
+      // If no image style is provided, we use the original image.
+      $element[$delta]['#path'] = $item['uri'];
+    }
+
+    // The HOVER PREVIEW STYLE. No checks because we set default so variables are always set.
+    $element[$delta]['#attributes']['data-hover-preview'] = image_style_url($display['settings']['image_preview_style'], $item['uri']);
+
+    // ZOOM IMAGE STYLE.
+    $element[$delta]['#attributes']['data-hover-zoom'] = image_style_url($display['settings']['image_preview_zoom_style'], $item['uri']);
+
+    // Provide the HOVER PREVIEW STYLE class and the action.
+    $action = $display['settings']['image_preview_action'];
+    $element[$delta]['#attributes']['class'][] = 'hover-preview-' . $action;
+    $element[$delta]['#attributes']['class'][] = 'hover-preview';
+
+    // Provide the ZOOM class.
+    $element[$delta]['#attributes']['class'][] = 'hover-preview-zoom';
+
+    // Special use cases for certain hover preview actions.
+    switch ($action) {
+      // Image Preview requires the imgPreview library.
+      case 'imgpreview':
+        $element[$delta]['#attached']['library'][] = array('image_preview', 'imgPreview');
+        break;
+    }
+
+    // Check if the formatter involves a link.
+    switch ($display['settings']['image_link']) {
+      case 'content':
+        // Link directly to the entity content.
+        $uri = entity_uri($entity_type, $entity);
+        $element[$delta]['#prefix'] = '<a href="' . url($uri['path'], $uri['options']) . '">';
+        $element[$delta]['#suffix'] = '</a>';
+        break;
+      case 'file':
+        // Link directly to the file.
+        $element[$delta]['#prefix'] = '<a href="' . file_create_url($item['uri']) . '">';
+        $element[$delta]['#suffix'] = '</a>';
+        break;
+    }
+
+    // The Hover Preview module requires the JavaScript to load the behaviors.
+    $element[$delta]['#attached']['js'][] = array(
+      'data' => drupal_get_path('module', 'image_preview') . '/image_preview.js',
+      'type' => 'file',
+    );
+
+    // Add hoverIntent with the Library API.
+    $path = libraries_get_path('hoverIntent');
+    if ($path) {
+      $element[$delta]['#attached']['js'][] = array(
+        'data' => $path . '/jquery.hoverIntent.minified.js',
+        'type' => 'file',
+      );
+    }
+    else {
+      drupal_set_message(t('HoverIntent JS library not installed in sites/all/libraries, image_preview module will not work without it.'), 'error');
+    }
+
+  }
+
+  return $element;
+}

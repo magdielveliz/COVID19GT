@@ -1,0 +1,16 @@
+<?php
+
+/**
+ * @file
+ * Declare the view API in use.
+ */
+
+/**
+ * Implementation of hook_views_api().
+ */
+function footnotes_views_views_api() {
+  $view = array(
+    'api' => 2,
+  );
+  return $view;
+}

@@ -1,0 +1,62 @@
+<?php
+/**
+ * @file
+ * Install file for the fancy_grid module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function fancy_grid_install() {
+  fancy_grid_update_7000();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function fancy_grid_uninstall() {
+  variable_del('fancy_grid_layouts');
+  variable_del('fancy_grid_breakpoint_group');
+  variable_del('fancy_grid_grid_width');
+  variable_del('fancy_grid_grid_max_width');
+  variable_del('fancy_grid_compile');
+  variable_del('fancy_grid_compile_webservice');
+}
+
+/**
+ * Convert the flexigrid variables to fancy_grid
+ */
+function fancy_grid_update_7000(&$sandbox = NULL) {
+  if ((variable_get('fancy_grid_layouts', FALSE) === FALSE) && (variable_get('flexigrid_layouts', FALSE) !== FALSE)) {
+    $flexigrid_layouts = variable_get('flexigrid_layouts', FALSE);
+    reset($flexigrid_layouts);
+    $flexigrid_layout = key($flexigrid_layouts);
+
+    $breakpoint_groups = breakpoints_breakpoint_group_load_all();
+    reset($breakpoint_groups);
+    $breakpoint_group = key($breakpoint_groups);
+
+    $var = array();
+    foreach ($breakpoint_groups[$breakpoint_group]->breakpoints as $bp_key) {
+      $bp = breakpoints_breakpoint_load_by_fullkey($bp_key);
+      $var[$bp_key] = array(
+        'breakpoint' => $bp->breakpoint,
+        'identifier' => strtolower($bp->name),
+        'columns' => $flexigrid_layouts[$flexigrid_layout]['columns'],
+        'gutters' => $flexigrid_layouts[$flexigrid_layout]['gutters'],
+        'config' => $flexigrid_layouts[$flexigrid_layout]['config'],
+      );
+    }
+    variable_set('fancy_grid_layouts', $var);
+    variable_set('fancy_grid_breakpoint_group', $breakpoint_group);
+    variable_del('flexigrid_layouts');
+  }
+  if ((variable_get('fancy_grid_grid_width', FALSE) === FALSE) && (variable_get('flexigrid_grid_width', FALSE) !== FALSE)) {
+    variable_set('fancy_grid_grid_width', variable_get('flexigrid_grid_width', '90%'));
+    variable_del('flexigrid_grid_width');
+  }
+  if ((variable_get('fancy_grid_grid_max_width', FALSE) === FALSE) && (variable_get('flexigrid_grid_max_width', FALSE) !== FALSE)) {
+    variable_set('fancy_grid_grid_max_width', variable_get('flexigrid_grid_max_width', '960px'));
+    variable_del('flexigrid_grid_max_width');
+  }
+}

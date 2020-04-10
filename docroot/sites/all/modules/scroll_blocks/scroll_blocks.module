@@ -1,0 +1,200 @@
+<?php
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Adds scroll_blocks settings to block configuration form
+ * (block_admin_configure).
+ */
+function scroll_blocks_form_alter(&$form, $form_state, $form_id) {
+
+  if ($form_id == 'block_admin_configure') {
+
+    $block_id = $form['module']['#value'] . ':' . $form['delta']['#value'];
+    $scroll_blocks_settings = variable_get('scroll_blocks_settings', []);
+
+    $form['scroll_blocks_settings'] = [
+      '#type' => 'fieldset',
+      '#title' => t('Popup settings'),
+      '#collapsible' => TRUE,
+      '#collapsed' => !isset($scroll_blocks_settings[$block_id]),
+      '#weight' => 1,
+    ];
+
+    $form['scroll_blocks_settings']['scroll_blocks_enabled'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Enable popping up on this block.'),
+      '#default_value' => isset($scroll_blocks_settings[$block_id]),
+    ];
+
+    $form['scroll_blocks_settings']['scroll_blocks_min_scroll_distance'] = [
+      '#type' => 'textfield',
+      '#title' => t('Reveal scroll distance'),
+      '#description' => t('After how many pixels of scrolling down should this block be revealed.'),
+      '#size' => 5,
+      '#maxlength' => 5,
+      '#default_value' => isset($scroll_blocks_settings[$block_id]) ? $scroll_blocks_settings[$block_id]['scroll_blocks_min_scroll_distance'] : '',
+    ];
+    $form['scroll_blocks_settings']['scroll_blocks_max_scroll_distance'] = [
+      '#type' => 'textfield',
+      '#title' => t('Hide scroll distance'),
+      '#description' => t('After how many pixels of scrolling down should this block be hidden.'),
+      '#size' => 5,
+      '#maxlength' => 5,
+      '#default_value' => isset($scroll_blocks_settings[$block_id]) ? $scroll_blocks_settings[$block_id]['scroll_blocks_max_scroll_distance'] : '',
+    ];
+
+    $form['scroll_blocks_settings']['scroll_blocks_min_width'] = [
+      '#type' => 'textfield',
+      '#title' => t('Min window width'),
+      '#description' => t('The block will be revealed only if the window width is less or equal to this value. Use zero value or leave empty for no limit.'),
+      '#size' => 5,
+      '#maxlength' => 5,
+      '#default_value' => isset($scroll_blocks_settings[$block_id]) ? $scroll_blocks_settings[$block_id]['scroll_blocks_min_width'] : '',
+    ];
+    $form['scroll_blocks_settings']['scroll_blocks_max_width'] = [
+      '#type' => 'textfield',
+      '#title' => t('Max window width'),
+      '#description' => t('The block will be revealed only if the window width is greater or equal to this value. Use zero value or leave empty for no limit.'),
+      '#size' => 5,
+      '#maxlength' => 5,
+      '#default_value' => isset($scroll_blocks_settings[$block_id]) ? $scroll_blocks_settings[$block_id]['scroll_blocks_max_width'] : '',
+    ];
+
+    $form['#validate'][] = '_scroll_blocks_admin_form_validate';
+    $form['#submit'][] = '_scroll_blocks_admin_form_submit';
+  }
+}
+
+/**
+ * Custom validation callback for block_admin_configure form.
+ *
+ * 1) Validates for non negative integer value on min scroll distance.
+ * 2) Validates for non negative integer value on max scroll distance.
+ * 3) Makes sure that the block hiding scroll distance is bigger than the
+ * revealing one.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function _scroll_blocks_admin_form_validate(&$form, &$form_state) {
+  $values = $form_state['values'];
+
+  $scroll_blocks_enabled = $values['scroll_blocks_enabled'];
+
+  if ($scroll_blocks_enabled) {
+    $scroll_blocks_min_scroll_distance = $values['scroll_blocks_min_scroll_distance'];
+    $scroll_blocks_max_scroll_distance = $values['scroll_blocks_max_scroll_distance'];
+    if (!is_numeric($scroll_blocks_min_scroll_distance) || $scroll_blocks_min_scroll_distance === '' || $scroll_blocks_min_scroll_distance < 0) {
+      form_set_error('scroll_blocks_min_scroll_distance', t('You need to enter a non negative integer for min scroll distance.'));
+    }
+    if (!is_numeric($scroll_blocks_max_scroll_distance) || $scroll_blocks_max_scroll_distance === '' || $scroll_blocks_max_scroll_distance < 0) {
+      form_set_error('scroll_blocks_max_scroll_distance', t('You need to enter a non negative integer for max scroll distance.'));
+
+    }
+
+    if ($scroll_blocks_min_scroll_distance >= $scroll_blocks_max_scroll_distance) {
+      form_set_error('scroll_blocks_max_scroll_distance', t('The max distance value needs to be higher than the min.'));
+    }
+  }
+}
+
+/**
+ * Custom submit callback for block_admin_configure form.
+ *
+ * Store the scroll_blocks configuration to a variable.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function _scroll_blocks_admin_form_submit(&$form, &$form_state) {
+  $values = $form_state['values'];
+
+  $block_id = $values['module'] . ':' . $values['delta'];
+
+  // @TODO refactor
+
+  $scroll_blocks_enabled = $values['scroll_blocks_enabled'];
+  $scroll_blocks_min_scroll_distance = (int) $values['scroll_blocks_min_scroll_distance'];
+  $scroll_blocks_max_scroll_distance = (int) $values['scroll_blocks_max_scroll_distance'];
+  $scroll_blocks_min_width = (int) $values['scroll_blocks_min_width'];
+  $scroll_blocks_max_width = (int) $values['scroll_blocks_max_width'];
+
+  $scroll_blocks_settings = variable_get('scroll_blocks_settings', []);
+
+  if ($scroll_blocks_enabled) {
+    // Save the values
+    $scroll_blocks_settings[$block_id] = [
+      'scroll_blocks_min_scroll_distance' => $scroll_blocks_min_scroll_distance,
+      'scroll_blocks_max_scroll_distance' => $scroll_blocks_max_scroll_distance,
+      'scroll_blocks_min_width' => $scroll_blocks_min_width,
+      'scroll_blocks_max_width' => $scroll_blocks_max_width,
+    ];
+    variable_set('scroll_blocks_settings', $scroll_blocks_settings);
+  }
+  else {
+    // Make sure the values are removed.
+    $scroll_blocks_settings = variable_get('scroll_blocks_settings', []);
+    if (isset($scroll_blocks_settings[$block_id])) {
+      unset($scroll_blocks_settings[$block_id]);
+      variable_set('scroll_blocks_settings', $scroll_blocks_settings);
+    }
+  }
+}
+
+/**
+ * Implements hook_block_view_alter().
+ *
+ * Attaches javascript on the blocks where the scroll_blocks functionality has
+ * been enabled.
+ * Attaches also some default CSS.
+ */
+function scroll_blocks_block_view_alter(&$data, $block) {
+  $scroll_blocks_settings = variable_get('scroll_blocks_settings', []);
+  $block_id = $block->module . ':' . $block->delta;
+  if (!isset($scroll_blocks_settings[$block_id])) {
+    return;
+  }
+
+  // Create settings array.
+  $settings_js = [
+    drupal_clean_css_identifier($block->module) => [
+      drupal_clean_css_identifier($block->delta) => [
+        'scroll_blocks_min_scroll_distance' => $scroll_blocks_settings[$block_id]['scroll_blocks_min_scroll_distance'],
+        'scroll_blocks_max_scroll_distance' => $scroll_blocks_settings[$block_id]['scroll_blocks_max_scroll_distance'],
+        'scroll_blocks_min_width' => $scroll_blocks_settings[$block_id]['scroll_blocks_min_width'],
+        'scroll_blocks_max_width' => $scroll_blocks_settings[$block_id]['scroll_blocks_max_width'],
+      ],
+    ],
+  ];
+
+  // Attach the settings array.
+  drupal_add_js(['scroll_blocks' => $settings_js], 'setting');
+
+  // Attach the js file that provides the functionality.
+  drupal_add_js(drupal_get_path('module', 'scroll_blocks') . '/js/scroll_blocks.js', [
+    'type' => 'file',
+    'scope' => 'footer',
+  ]);
+
+  // Attach some default CSS.
+  drupal_add_css(drupal_get_path('module', 'scroll_blocks') . '/css/scroll_blocks.css', [
+    'group' => CSS_DEFAULT,
+    'every_page' => TRUE,
+  ]);
+}
+
+/**
+ * Implements hook_preprocess_block().
+ *
+ * Adds a class to the blocks where the scroll_blocks functionality has been
+ * enabled.
+ */
+function scroll_blocks_preprocess_block(&$variables) {
+  $block = $variables['block'];
+  $scroll_blocks_settings = variable_get('scroll_blocks_settings', []);
+  $block_id = $block->module . ':' . $block->delta;
+  if (isset($scroll_blocks_settings[$block_id])) {
+    $variables['classes_array'][] = 'scroll-blocks';
+  }
+}
